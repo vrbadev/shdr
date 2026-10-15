@@ -18,10 +18,10 @@ GPU device. Applications with an existing GL context can supply their own resolv
 | GPU compute | OpenGL ES 3.1/3.2 or desktop OpenGL 4.3+ |
 | Headless GPU backend | EGL development files and a compatible driver |
 
-Start with the [documentation](https://YOUR-USERNAME.github.io/shdr/) and its
-[example walkthroughs](https://YOUR-USERNAME.github.io/shdr/examples.html). Read the [compatibility guide](https://YOUR-USERNAME.github.io/shdr/portability.html) for the supported GLSL subset,
-the [API reference](https://YOUR-USERNAME.github.io/shdr/api.html) for runtime functions, and the
-[imaging guide](https://YOUR-USERNAME.github.io/shdr/imaging.html) for reusable processing kernels.
+Start with the [documentation](https://vrbadev.github.io/shdr/) and its
+[example walkthroughs](https://vrbadev.github.io/shdr/examples.html). Read the [compatibility guide](https://vrbadev.github.io/shdr/portability.html) for the supported GLSL subset,
+the [API reference](https://vrbadev.github.io/shdr/api.html) for runtime functions, and the
+[imaging guide](https://vrbadev.github.io/shdr/imaging.html) for reusable processing kernels.
 
 ## Build and try a pipeline
 
@@ -226,7 +226,7 @@ throws immediately. Inputs must already be available on the host, and concurrent
 jobs must have distinct writable resources. Call `workers.shutdown()` at an
 explicit shutdown point. It finishes accepted jobs and joins the workers.
 
-The [asynchronous execution guide](https://YOUR-USERNAME.github.io/shdr/async.html) explains resource lifetimes,
+The [asynchronous execution guide](https://vrbadev.github.io/shdr/async.html) explains resource lifetimes,
 polling, queue limits and latency boundaries. Submission returns a completion
 handle, and the application chooses when to poll or wait. Driver scheduling and
 resource preparation also contribute to submission latency.
@@ -319,14 +319,14 @@ conversions. The embedded portable GPU variant can normalize interface layouts,
 numeric casts and local `const` qualifiers while retaining expression order.
 The compatibility guide describes supported features and source transformations.
 
-A [pinned public shader collection](https://YOUR-USERNAME.github.io/shdr/corpus.html) checks
+A [pinned public shader collection](https://vrbadev.github.io/shdr/corpus.html) checks
 664 compute inputs from five projects. Of 443 inputs accepted by a reference
 compiler, 258 build strict C++11 adapters and all 258 compile for all five GPU
 profiles. The report records source configuration, provenance, failures and
 per-profile results. These are compiler checks. The bundled pipeline tests
 separately verify CPU/GPU execution and output parity.
 
-Begin by checking the [source compatibility guide](https://YOUR-USERNAME.github.io/shdr/portability.html). Compute
+Begin by checking the [source compatibility guide](https://vrbadev.github.io/shdr/portability.html). Compute
 shaders with independent invocations, supported storage-buffer/image interfaces,
 and ordinary scalar/vector/matrix expressions are the common portable case.
 For shaders that use samplers, graphics stages, synchronization, or custom
@@ -363,16 +363,16 @@ an appropriate tolerance.
 Run an executable with its default arguments for CPU execution or with
 `--gpu es31` for a supported GPU profile. Examples check their outputs against independent
 references. The vision example also checks four known square corners. The
-[imaging guide](https://YOUR-USERNAME.github.io/shdr/imaging.html) lists formats, ports, dimensions, and parameters
+[imaging guide](https://vrbadev.github.io/shdr/imaging.html) lists formats, ports, dimensions, and parameters
 for the reusable native shader modules.
-The [EVT3 guide](https://YOUR-USERNAME.github.io/shdr/evt3.html) shows ordered event-camera decoding across batches,
+The [EVT3 guide](https://vrbadev.github.io/shdr/evt3.html) shows ordered event-camera decoding across batches,
 including the input packing, event representation and stream-state policies.
-The [neural guide](https://YOUR-USERNAME.github.io/shdr/neural.html) shows complete training and separate inference
+The [neural guide](https://vrbadev.github.io/shdr/neural.html) shows complete training and separate inference
 for the small ANN, CNN and transformer models, including their parameter layouts
 and gradient checks.
-The [signal guide](https://YOUR-USERNAME.github.io/shdr/signals.html) shows one-dimensional FFTs, low-pass,
+The [signal guide](https://vrbadev.github.io/shdr/signals.html) shows one-dimensional FFTs, low-pass,
 high-pass and band filters, windows and persistent stream state.
-The [public-data guide](https://YOUR-USERNAME.github.io/shdr/datasets.html) runs those processing families on
+The [public-data guide](https://vrbadev.github.io/shdr/datasets.html) runs those processing families on
 recorded inputs with checked provenance and transformations. It includes a
 seven-stage LeNet-style classifier with 61,706 prepared parameters, original
 MNIST test labels and independent framework logits. The default evaluation uses
@@ -456,9 +456,9 @@ details for each configuration.
 | FFT band-pass | 8 × 1024 complex, 4-10 kHz | 3.219 | 11.268 | 2.250 | 0.222 | 6.153 | 5.001 |
 | LeNet classifier | 32 × 28 × 28, 61,706 parameters | 46.521 | 7.622 | 40.790 | 1.756 | 116.491 | 136.617 |
 
-Reports: [Ryzen 5900X / llvmpipe](https://YOUR-USERNAME.github.io/shdr/benchmarks/amd-ryzen-5900x.html),
-[Core i7-1260P / Iris Xe](https://YOUR-USERNAME.github.io/shdr/benchmarks/intel-core-i7-1260p.html), and
-[Raspberry Pi 5 / V3D](https://YOUR-USERNAME.github.io/shdr/benchmarks/raspberry-pi-5.html).
+Reports: [Ryzen 5900X / llvmpipe](https://vrbadev.github.io/shdr/benchmarks/amd-ryzen-5900x.html),
+[Core i7-1260P / Iris Xe](https://vrbadev.github.io/shdr/benchmarks/intel-core-i7-1260p.html), and
+[Raspberry Pi 5 / V3D](https://vrbadev.github.io/shdr/benchmarks/raspberry-pi-5.html).
 
 EVT3 decoding processes 65536 sixteen-bit words and emits 223772 ordered events.
 Its five stages include state reset. The normal-flow case processes 610 seeded
@@ -494,6 +494,6 @@ These evaluation times include batch construction, input normalization, program
 setup, inference, result reads and score comparisons. They are separate from the
 resident pipeline timings above. The llvmpipe path uses software rendering on
 the Ryzen CPU. Every public-data functional case passed in all six runs.
-The [data guide](https://YOUR-USERNAME.github.io/shdr/datasets.html) explains the input transformations and metric
-limits. The [complete results](https://YOUR-USERNAME.github.io/shdr/results.html#real-data) record exact model,
+The [data guide](https://vrbadev.github.io/shdr/datasets.html) explains the input transformations and metric
+limits. The [complete results](https://vrbadev.github.io/shdr/results.html#real-data) record exact model,
 dataset and implementation fingerprints.
