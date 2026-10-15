@@ -1,0 +1,53 @@
+/* Static Pygments token colors for code excerpts, API declarations and numbered sources. */
+/* No font, script, stylesheet or network request is needed outside the published site. */
+:root {
+  --syntax-comment: #526257;
+  --syntax-keyword: #214c88;
+  --syntax-type: #663785;
+  --syntax-string: #25613b;
+  --syntax-number: #78318d;
+  --syntax-function: #075c7d;
+  --syntax-preprocessor: #85400e;
+  --syntax-operator: #42564b;
+  --syntax-error: #9c2033;
+}
+/* Respect the site's dark appearance with colors tested on its dark code background. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --syntax-comment: #abc2ad;
+    --syntax-keyword: #9fc8ff;
+    --syntax-type: #d6b6f5;
+    --syntax-string: #acd993;
+    --syntax-number: #e4b8f2;
+    --syntax-function: #8ed7ed;
+    --syntax-preprocessor: #f5c493;
+    --syntax-operator: #c3d5c8;
+    --syntax-error: #ffb1ba;
+  }
+}
+/* Pygments uses stable short categories, prefixed here to avoid collisions with page styles. */
+.tok-c, .tok-ch, .tok-cm, .tok-c1, .tok-cs { color: var(--syntax-comment); }
+.tok-k, .tok-kc, .tok-kd, .tok-kn, .tok-kp, .tok-kr, .tok-ow { color: var(--syntax-keyword); font-weight: 600; }
+.tok-kt, .tok-nc, .tok-no, .tok-nd, .tok-nn { color: var(--syntax-type); }
+.tok-s, .tok-sa, .tok-sb, .tok-sc, .tok-dl, .tok-sd, .tok-s2, .tok-se, .tok-sh, .tok-si, .tok-sx, .tok-sr, .tok-s1, .tok-ss { color: var(--syntax-string); }
+.tok-m, .tok-mb, .tok-mf, .tok-mh, .tok-mi, .tok-mo, .tok-il { color: var(--syntax-number); }
+.tok-nf, .tok-fm, .tok-nb, .tok-bp, .tok-na { color: var(--syntax-function); }
+.tok-cp, .tok-cpf { color: var(--syntax-preprocessor); }
+.tok-o, .tok-p, .tok-pm { color: var(--syntax-operator); }
+.tok-err, .tok-gr, .tok-gt { color: var(--syntax-error); text-decoration: underline dotted; text-underline-offset: .18em; }
+.tok-gs { font-weight: 700; }
+.tok-ge { font-style: italic; }
+/* Keep printed excerpts readable even when the reader normally chooses a dark theme. */
+@media print {
+  :root {
+    --syntax-comment: #526257;
+    --syntax-keyword: #214c88;
+    --syntax-type: #663785;
+    --syntax-string: #25613b;
+    --syntax-number: #78318d;
+    --syntax-function: #075c7d;
+    --syntax-preprocessor: #85400e;
+    --syntax-operator: #42564b;
+    --syntax-error: #9c2033;
+  }
+}

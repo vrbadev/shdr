@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Read and download the documented shdr example and library sources."><title>Read the source · shdr 1.0.0</title><link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="../highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="../index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="../index.html">Start</a><a href="../examples.html">Examples</a><a href="../results.html">Results</a><a href="../corpus.html">Public shaders</a><a href="../api.html">API</a></nav></div></header><div class="page-shell"><main class="page-main source-view" id="content"><p class="eyebrow">Complete files</p><h1>Read the source</h1><p class="lead">Follow a complete application, inspect one shader, or look up a reusable pipeline wrapper. Every file has line links and an exact download.</p><p>Start with <a href="../examples.html">the example catalog</a> for a guided choice. Native shader files are converted during the build. Their C++ adapters and portable GPU variants are embedded in the application.</p><label for="file-search">Find a source file</label><input type="search" id="file-search" placeholder="Try affine, fft, lenet or data_sources"><p id="file-count" class="muted" aria-live="polite">111 files</p><ul class="file-list"><li data-file="cmakelists.txt"><a href="CMakeLists.txt.html"><code>CMakeLists.txt</code></a></li>
+<li data-file="cmake/shdr.cmake"><a href="cmake/shdr.cmake.html"><code>cmake/shdr.cmake</code></a></li>
+<li data-file="detail/async.hpp"><a href="detail/async.hpp.html"><code>detail/async.hpp</code></a></li>
+<li data-file="detail/egl.hpp"><a href="detail/egl.hpp.html"><code>detail/egl.hpp</code></a></li>
+<li data-file="detail/macros.hpp"><a href="detail/macros.hpp.html"><code>detail/macros.hpp</code></a></li>
+<li data-file="detail/math.hpp"><a href="detail/math.hpp.html"><code>detail/math.hpp</code></a></li>
+<li data-file="detail/runtime.hpp"><a href="detail/runtime.hpp.html"><code>detail/runtime.hpp</code></a></li>
+<li data-file="examples/async.cpp"><a href="examples/async.cpp.html"><code>examples/async.cpp</code></a></li>
+<li data-file="examples/benchmark.cpp"><a href="examples/benchmark.cpp.html"><code>examples/benchmark.cpp</code></a></li>
+<li data-file="examples/cnn.cpp"><a href="examples/cnn.cpp.html"><code>examples/cnn.cpp</code></a></li>
+<li data-file="examples/data/readme.md"><a href="examples/data/readme.md.html"><code>examples/data/readme.md</code></a></li>
+<li data-file="examples/dynamic.cpp"><a href="examples/dynamic.cpp.html"><code>examples/dynamic.cpp</code></a></li>
+<li data-file="examples/egl_context.hpp"><a href="examples/egl_context.hpp.html"><code>examples/egl_context.hpp</code></a></li>
+<li data-file="examples/evt3.cpp"><a href="examples/evt3.cpp.html"><code>examples/evt3.cpp</code></a></li>
+<li data-file="examples/evt3_flow_checks.hpp"><a href="examples/evt3_flow_checks.hpp.html"><code>examples/evt3_flow_checks.hpp</code></a></li>
+<li data-file="examples/evt3_support.hpp"><a href="examples/evt3_support.hpp.html"><code>examples/evt3_support.hpp</code></a></li>
+<li data-file="examples/export_shader.cpp"><a href="examples/export_shader.cpp.html"><code>examples/export_shader.cpp</code></a></li>
+<li data-file="examples/fft_checks.hpp"><a href="examples/fft_checks.hpp.html"><code>examples/fft_checks.hpp</code></a></li>
+<li data-file="examples/fft_support.hpp"><a href="examples/fft_support.hpp.html"><code>examples/fft_support.hpp</code></a></li>
+<li data-file="examples/hybrid.cpp"><a href="examples/hybrid.cpp.html"><code>examples/hybrid.cpp</code></a></li>
+<li data-file="examples/images.cpp"><a href="examples/images.cpp.html"><code>examples/images.cpp</code></a></li>
+<li data-file="examples/imaging.cpp"><a href="examples/imaging.cpp.html"><code>examples/imaging.cpp</code></a></li>
+<li data-file="examples/lenet_checks.hpp"><a href="examples/lenet_checks.hpp.html"><code>examples/lenet_checks.hpp</code></a></li>
+<li data-file="examples/lenet_support.hpp"><a href="examples/lenet_support.hpp.html"><code>examples/lenet_support.hpp</code></a></li>
+<li data-file="examples/neural.cpp"><a href="examples/neural.cpp.html"><code>examples/neural.cpp</code></a></li>
+<li data-file="examples/neural_checks.hpp"><a href="examples/neural_checks.hpp.html"><code>examples/neural_checks.hpp</code></a></li>
+<li data-file="examples/neural_support.hpp"><a href="examples/neural_support.hpp.html"><code>examples/neural_support.hpp</code></a></li>
+<li data-file="examples/pipeline.cpp"><a href="examples/pipeline.cpp.html"><code>examples/pipeline.cpp</code></a></li>
+<li data-file="examples/plugin.cpp"><a href="examples/plugin.cpp.html"><code>examples/plugin.cpp</code></a></li>
+<li data-file="examples/real_data.cpp"><a href="examples/real_data.cpp.html"><code>examples/real_data.cpp</code></a></li>
+<li data-file="examples/real_data_support.hpp"><a href="examples/real_data_support.hpp.html"><code>examples/real_data_support.hpp</code></a></li>
+<li data-file="examples/runner.hpp"><a href="examples/runner.hpp.html"><code>examples/runner.hpp</code></a></li>
+<li data-file="examples/shaders/affine.cpp"><a href="examples/shaders/affine.cpp.html"><code>examples/shaders/affine.cpp</code></a></li>
+<li data-file="examples/shaders/ann_gradient.cpp"><a href="examples/shaders/ann_gradient.cpp.html"><code>examples/shaders/ann_gradient.cpp</code></a></li>
+<li data-file="examples/shaders/ann_infer.cpp"><a href="examples/shaders/ann_infer.cpp.html"><code>examples/shaders/ann_infer.cpp</code></a></li>
+<li data-file="examples/shaders/bayer_unpack.cpp"><a href="examples/shaders/bayer_unpack.cpp.html"><code>examples/shaders/bayer_unpack.cpp</code></a></li>
+<li data-file="examples/shaders/blur.cpp"><a href="examples/shaders/blur.cpp.html"><code>examples/shaders/blur.cpp</code></a></li>
+<li data-file="examples/shaders/buffer_to_image.cpp"><a href="examples/shaders/buffer_to_image.cpp.html"><code>examples/shaders/buffer_to_image.cpp</code></a></li>
+<li data-file="examples/shaders/clamp.cpp"><a href="examples/shaders/clamp.cpp.html"><code>examples/shaders/clamp.cpp</code></a></li>
+<li data-file="examples/shaders/cnn_gradient.cpp"><a href="examples/shaders/cnn_gradient.cpp.html"><code>examples/shaders/cnn_gradient.cpp</code></a></li>
+<li data-file="examples/shaders/cnn_infer.cpp"><a href="examples/shaders/cnn_infer.cpp.html"><code>examples/shaders/cnn_infer.cpp</code></a></li>
+<li data-file="examples/shaders/convolution2d.cpp"><a href="examples/shaders/convolution2d.cpp.html"><code>examples/shaders/convolution2d.cpp</code></a></li>
+<li data-file="examples/shaders/convolution3d.cpp"><a href="examples/shaders/convolution3d.cpp.html"><code>examples/shaders/convolution3d.cpp</code></a></li>
+<li data-file="examples/shaders/debayer.cpp"><a href="examples/shaders/debayer.cpp.html"><code>examples/shaders/debayer.cpp</code></a></li>
+<li data-file="examples/shaders/dft_columns.cpp"><a href="examples/shaders/dft_columns.cpp.html"><code>examples/shaders/dft_columns.cpp</code></a></li>
+<li data-file="examples/shaders/dft_rows.cpp"><a href="examples/shaders/dft_rows.cpp.html"><code>examples/shaders/dft_rows.cpp</code></a></li>
+<li data-file="examples/shaders/evt3_emit.cpp"><a href="examples/shaders/evt3_emit.cpp.html"><code>examples/shaders/evt3_emit.cpp</code></a></li>
+<li data-file="examples/shaders/evt3_flow.cpp"><a href="examples/shaders/evt3_flow.cpp.html"><code>examples/shaders/evt3_flow.cpp</code></a></li>
+<li data-file="examples/shaders/evt3_reset.cpp"><a href="examples/shaders/evt3_reset.cpp.html"><code>examples/shaders/evt3_reset.cpp</code></a></li>
+<li data-file="examples/shaders/evt3_seed.cpp"><a href="examples/shaders/evt3_seed.cpp.html"><code>examples/shaders/evt3_seed.cpp</code></a></li>
+<li data-file="examples/shaders/evt3_summary.cpp"><a href="examples/shaders/evt3_summary.cpp.html"><code>examples/shaders/evt3_summary.cpp</code></a></li>
+<li data-file="examples/shaders/fft_bit_reverse.cpp"><a href="examples/shaders/fft_bit_reverse.cpp.html"><code>examples/shaders/fft_bit_reverse.cpp</code></a></li>
+<li data-file="examples/shaders/fft_butterfly.cpp"><a href="examples/shaders/fft_butterfly.cpp.html"><code>examples/shaders/fft_butterfly.cpp</code></a></li>
+<li data-file="examples/shaders/gaussian_horizontal.cpp"><a href="examples/shaders/gaussian_horizontal.cpp.html"><code>examples/shaders/gaussian_horizontal.cpp</code></a></li>
+<li data-file="examples/shaders/gaussian_vertical.cpp"><a href="examples/shaders/gaussian_vertical.cpp.html"><code>examples/shaders/gaussian_vertical.cpp</code></a></li>
+<li data-file="examples/shaders/harris_response.cpp"><a href="examples/shaders/harris_response.cpp.html"><code>examples/shaders/harris_response.cpp</code></a></li>
+<li data-file="examples/shaders/harris_tensor.cpp"><a href="examples/shaders/harris_tensor.cpp.html"><code>examples/shaders/harris_tensor.cpp</code></a></li>
+<li data-file="examples/shaders/image_to_buffer.cpp"><a href="examples/shaders/image_to_buffer.cpp.html"><code>examples/shaders/image_to_buffer.cpp</code></a></li>
+<li data-file="examples/shaders/lenet_conv.cpp"><a href="examples/shaders/lenet_conv.cpp.html"><code>examples/shaders/lenet_conv.cpp</code></a></li>
+<li data-file="examples/shaders/lenet_dense.cpp"><a href="examples/shaders/lenet_dense.cpp.html"><code>examples/shaders/lenet_dense.cpp</code></a></li>
+<li data-file="examples/shaders/lenet_pool.cpp"><a href="examples/shaders/lenet_pool.cpp.html"><code>examples/shaders/lenet_pool.cpp</code></a></li>
+<li data-file="examples/shaders/luminance.cpp"><a href="examples/shaders/luminance.cpp.html"><code>examples/shaders/luminance.cpp</code></a></li>
+<li data-file="examples/shaders/math.cpp"><a href="examples/shaders/math.cpp.html"><code>examples/shaders/math.cpp</code></a></li>
+<li data-file="examples/shaders/nn_binary_loss.cpp"><a href="examples/shaders/nn_binary_loss.cpp.html"><code>examples/shaders/nn_binary_loss.cpp</code></a></li>
+<li data-file="examples/shaders/nn_sgd.cpp"><a href="examples/shaders/nn_sgd.cpp.html"><code>examples/shaders/nn_sgd.cpp</code></a></li>
+<li data-file="examples/shaders/nonmax.cpp"><a href="examples/shaders/nonmax.cpp.html"><code>examples/shaders/nonmax.cpp</code></a></li>
+<li data-file="examples/shaders/rgba_float_image.cpp"><a href="examples/shaders/rgba_float_image.cpp.html"><code>examples/shaders/rgba_float_image.cpp</code></a></li>
+<li data-file="examples/shaders/rgba_int_image.cpp"><a href="examples/shaders/rgba_int_image.cpp.html"><code>examples/shaders/rgba_int_image.cpp</code></a></li>
+<li data-file="examples/shaders/rgba_uint_image.cpp"><a href="examples/shaders/rgba_uint_image.cpp.html"><code>examples/shaders/rgba_uint_image.cpp</code></a></li>
+<li data-file="examples/shaders/rle_count.cpp"><a href="examples/shaders/rle_count.cpp.html"><code>examples/shaders/rle_count.cpp</code></a></li>
+<li data-file="examples/shaders/rle_decode.cpp"><a href="examples/shaders/rle_decode.cpp.html"><code>examples/shaders/rle_decode.cpp</code></a></li>
+<li data-file="examples/shaders/rle_encode.cpp"><a href="examples/shaders/rle_encode.cpp.html"><code>examples/shaders/rle_encode.cpp</code></a></li>
+<li data-file="examples/shaders/rle_offsets.cpp"><a href="examples/shaders/rle_offsets.cpp.html"><code>examples/shaders/rle_offsets.cpp</code></a></li>
+<li data-file="examples/shaders/scalar_images.cpp"><a href="examples/shaders/scalar_images.cpp.html"><code>examples/shaders/scalar_images.cpp</code></a></li>
+<li data-file="examples/shaders/signal_biquad.cpp"><a href="examples/shaders/signal_biquad.cpp.html"><code>examples/shaders/signal_biquad.cpp</code></a></li>
+<li data-file="examples/shaders/signal_fir.cpp"><a href="examples/shaders/signal_fir.cpp.html"><code>examples/shaders/signal_fir.cpp</code></a></li>
+<li data-file="examples/shaders/signal_frequency_mask.cpp"><a href="examples/shaders/signal_frequency_mask.cpp.html"><code>examples/shaders/signal_frequency_mask.cpp</code></a></li>
+<li data-file="examples/shaders/signal_window.cpp"><a href="examples/shaders/signal_window.cpp.html"><code>examples/shaders/signal_window.cpp</code></a></li>
+<li data-file="examples/shaders/sobel.cpp"><a href="examples/shaders/sobel.cpp.html"><code>examples/shaders/sobel.cpp</code></a></li>
+<li data-file="examples/shaders/sum.cpp"><a href="examples/shaders/sum.cpp.html"><code>examples/shaders/sum.cpp</code></a></li>
+<li data-file="examples/shaders/transformer_gradient.cpp"><a href="examples/shaders/transformer_gradient.cpp.html"><code>examples/shaders/transformer_gradient.cpp</code></a></li>
+<li data-file="examples/shaders/transformer_infer.cpp"><a href="examples/shaders/transformer_infer.cpp.html"><code>examples/shaders/transformer_infer.cpp</code></a></li>
+<li data-file="examples/signal.cpp"><a href="examples/signal.cpp.html"><code>examples/signal.cpp</code></a></li>
+<li data-file="examples/signal_filters.hpp"><a href="examples/signal_filters.hpp.html"><code>examples/signal_filters.hpp</code></a></li>
+<li data-file="examples/signal_filters_checks.hpp"><a href="examples/signal_filters_checks.hpp.html"><code>examples/signal_filters_checks.hpp</code></a></li>
+<li data-file="examples/spectral.cpp"><a href="examples/spectral.cpp.html"><code>examples/spectral.cpp</code></a></li>
+<li data-file="examples/transformer.cpp"><a href="examples/transformer.cpp.html"><code>examples/transformer.cpp</code></a></li>
+<li data-file="examples/transformer_reference.hpp"><a href="examples/transformer_reference.hpp.html"><code>examples/transformer_reference.hpp</code></a></li>
+<li data-file="examples/transformer_support.hpp"><a href="examples/transformer_support.hpp.html"><code>examples/transformer_support.hpp</code></a></li>
+<li data-file="examples/vision.cpp"><a href="examples/vision.cpp.html"><code>examples/vision.cpp</code></a></li>
+<li data-file="scripts/amalgamate.py"><a href="scripts/amalgamate.py.html"><code>scripts/amalgamate.py</code></a></li>
+<li data-file="scripts/check_docs.py"><a href="scripts/check_docs.py.html"><code>scripts/check_docs.py</code></a></li>
+<li data-file="scripts/compile_shader.py"><a href="scripts/compile_shader.py.html"><code>scripts/compile_shader.py</code></a></li>
+<li data-file="scripts/data_sources.py"><a href="scripts/data_sources.py.html"><code>scripts/data_sources.py</code></a></li>
+<li data-file="scripts/generate_api.py"><a href="scripts/generate_api.py.html"><code>scripts/generate_api.py</code></a></li>
+<li data-file="scripts/generate_sources.py"><a href="scripts/generate_sources.py.html"><code>scripts/generate_sources.py</code></a></li>
+<li data-file="scripts/generate_transformer.py"><a href="scripts/generate_transformer.py.html"><code>scripts/generate_transformer.py</code></a></li>
+<li data-file="scripts/highlight_docs.py"><a href="scripts/highlight_docs.py.html"><code>scripts/highlight_docs.py</code></a></li>
+<li data-file="scripts/plot_results.py"><a href="scripts/plot_results.py.html"><code>scripts/plot_results.py</code></a></li>
+<li data-file="scripts/prepare_datasets.py"><a href="scripts/prepare_datasets.py.html"><code>scripts/prepare_datasets.py</code></a></li>
+<li data-file="scripts/report_public_shaders.py"><a href="scripts/report_public_shaders.py.html"><code>scripts/report_public_shaders.py</code></a></li>
+<li data-file="scripts/train_lenet.py"><a href="scripts/train_lenet.py.html"><code>scripts/train_lenet.py</code></a></li>
+<li data-file="scripts/validate_glsl.py"><a href="scripts/validate_glsl.py.html"><code>scripts/validate_glsl.py</code></a></li>
+<li data-file="scripts/verify_public_shaders.py"><a href="scripts/verify_public_shaders.py.html"><code>scripts/verify_public_shaders.py</code></a></li>
+<li data-file="shdr.h"><a href="shdr.h.html"><code>shdr.h</code></a></li>
+<li data-file="tests/test_async.cpp"><a href="tests/test_async.cpp.html"><code>tests/test_async.cpp</code></a></li>
+<li data-file="tests/test_gpu.cpp"><a href="tests/test_gpu.cpp.html"><code>tests/test_gpu.cpp</code></a></li>
+<li data-file="tests/test_math.cpp"><a href="tests/test_math.cpp.html"><code>tests/test_math.cpp</code></a></li>
+<li data-file="tests/test_math_gpu.cpp"><a href="tests/test_math_gpu.cpp.html"><code>tests/test_math_gpu.cpp</code></a></li>
+<li data-file="tests/test_runtime.cpp"><a href="tests/test_runtime.cpp.html"><code>tests/test_runtime.cpp</code></a></li>
+<li data-file="tests/test_shader_compiler.py"><a href="tests/test_shader_compiler.py.html"><code>tests/test_shader_compiler.py</code></a></li></ul><script>
+// Filter the existing file links without requesting any network resources.
+const query = document.getElementById("file-search");
+const files = Array.from(document.querySelectorAll("[data-file]"));
+query.addEventListener("input", () => {
+  const words = query.value.toLowerCase().trim().split(/\s+/).filter(Boolean); // Match every search word.
+  let count = 0; // Count the visible files.
+  files.forEach(file => {
+    file.hidden = !words.every(word => file.dataset.file.includes(word)); // Preserve the original file order.
+    if (!file.hidden) count++; // Report the number of visible links.
+  });
+  document.getElementById("file-count").textContent = count + " files"; // Announce the updated count.
+});
+</script></main></div><footer class="footer"><p>shdr 1.0.0 · Source browser · <a href="../examples.html">Choose an example</a> · <a href="../portability.html">Portability and requirements</a></p></footer></body></html>

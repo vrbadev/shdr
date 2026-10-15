@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Build imaging pipelines"><title>Build imaging pipelines · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="build-imaging-pipelines">Build imaging pipelines</h1>
+<p>Image processing starts with a source buffer, a destination buffer, and one
+kernel. Add another destination and kernel to build a longer pipeline. The
+modules in <a href="examples.html#native-kernel-catalog">examples/shaders</a> provide ready-to-use Bayer,
+filtering, Fourier, corner-detection, and compression stages for this pattern.</p>
+<p>Attach a module with <code>shdr_target_shaders</code>, create its <code>filename_kernel</code> factory and bind the named resources. Application pipelines execute the embedded module. The processing kernels use the common ES 3.1, ES 3.2 and desktop GL 4.3 compute subset.</p>
+<p>Resource type <code>float</code>, <code>uint</code>, <code>vec2</code>, or <code>vec4</code> in the tables means
+<code>shdr::buffer&lt;float&gt;</code>, <code>shdr::buffer&lt;unsigned&gt;</code>, <code>shdr::buffer&lt;glsl::vec2&gt;</code>, or
+<code>shdr::buffer&lt;glsl::vec4&gt;</code> in C++ respectively. Input and output storage must be
+distinct for neighborhood filters, transforms, and compression stages.</p>
+<h2 id="start-with-a-filter">Start with a filter</h2>
+<p>Attach <code>examples/shaders/convolution2d.cpp</code> to an application target. Its factory
+then accepts two-channel pixels and a separate coefficient buffer:</p>
+<pre><code class="language-cpp"><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">width</span><span class="tok-o">=</span><span class="tok-mi">4</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">height</span><span class="tok-o">=</span><span class="tok-mi">4</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Choose a four-by-four demonstration image.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">pixels</span><span class="tok-p">(</span><span class="tok-n">width</span><span class="tok-o">*</span><span class="tok-n">height</span><span class="tok-p">)</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">filtered</span><span class="tok-p">(</span><span class="tok-n">width</span><span class="tok-o">*</span><span class="tok-n">height</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Allocate complex-valued input and output pixels.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">coefficients</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Create a normalized three-by-three averaging kernel.</span>
+<span class="tok-w">    </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Set the coefficients for the first kernel row.</span>
+<span class="tok-w">    </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Set the coefficients for the middle kernel row.</span>
+<span class="tok-w">    </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">1.f</span><span class="tok-o">/</span><span class="tok-mf">9.f</span><span class="tok-w"> </span><span class="tok-c1">// Set the coefficients for the final kernel row.</span>
+<span class="tok-p">}</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Finish the nine-coefficient filter.</span>
+<span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-o">=</span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-o">&lt;</span><span class="tok-n">width</span><span class="tok-o">*</span><span class="tok-n">height</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">i</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Initialize each pixel in row-major order.</span>
+<span class="tok-w">    </span><span class="tok-n">pixels</span><span class="tok-p">[</span><span class="tok-n">i</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-p">(</span><span class="tok-kt">float</span><span class="tok-p">(</span><span class="tok-n">i</span><span class="tok-p">)</span><span class="tok-p">,</span><span class="tok-mf">0.f</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Store a real test value with a zero imaginary component.</span>
+
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">filter</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">make_kernel</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">convolution2d_kernel</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create the embedded two-dimensional convolution kernel.</span>
+<span class="tok-n">filter</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">input_values</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-n">pixels</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Connect the source pixels.</span>
+<span class="tok-n">filter</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">output_values</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-n">filtered</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Connect the destination pixels.</span>
+<span class="tok-n">filter</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">coefficients</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-n">coefficients</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Connect the dynamic filter coefficients.</span>
+<span class="tok-n">filter</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">dimensions</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">uvec2</span><span class="tok-p">(</span><span class="tok-n">width</span><span class="tok-p">,</span><span class="tok-n">height</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set the image width and height.</span>
+<span class="tok-n">filter</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">kernel_size</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">uvec2</span><span class="tok-p">(</span><span class="tok-mi">3u</span><span class="tok-p">,</span><span class="tok-mi">3u</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set the filter width and height.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">filter</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Build a dispatch for the bound convolution resources.</span>
+<span class="tok-w">    </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">width</span><span class="tok-o">+</span><span class="tok-mi">7</span><span class="tok-p">)</span><span class="tok-o">/</span><span class="tok-mi">8</span><span class="tok-p">,</span><span class="tok-p">(</span><span class="tok-n">height</span><span class="tok-o">+</span><span class="tok-mi">7</span><span class="tok-p">)</span><span class="tok-o">/</span><span class="tok-mi">8</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Round image dimensions up to the shader's eight-by-eight groups.</span>
+<span class="tok-n">pipeline</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Run this convolution on the CPU.</span>
+</code></pre>
+<p>Each <code>vec2</code> can hold two image channels or one complex sample. Calling
+<code>pipeline.run(device)</code> selects the GPU with the same resources and coefficients.
+To add another filter, bind <code>filtered</code> as its input and connect its dispatch with
+<code>operator&gt;&gt;</code>.</p>
+<h2 id="bayer-unpacking-demosaicing-and-luminance">Bayer unpacking, demosaicing, and luminance</h2>
+<p><a href="source/examples/imaging.cpp.html">example_imaging</a> checks all sixteen combinations of four
+packed formats and four Bayer phases against an independent pixel reference.
+Inputs use a fixed random seed. The linked path is unpack → bilinear demosaic →
+luminance.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Shader factory</th>
+<th scope="col">Input → output ports</th>
+<th scope="col">Uniforms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="source/examples/shaders/bayer_unpack.cpp.html">bayer_unpack_kernel</a></td>
+<td><code>packed_words:uint</code> → <code>samples:uint</code></td>
+<td><code>count:uint</code>, <code>packing:uint</code>, <code>bit_depth:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/debayer.cpp.html">debayer_kernel</a></td>
+<td><code>samples:uint</code> → <code>colors:vec4</code></td>
+<td><code>width:uint</code>, <code>height:uint</code>, <code>pattern:uint</code>, <code>bit_depth:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/luminance.cpp.html">luminance_kernel</a></td>
+<td><code>colors:vec4</code> → <code>gray:float</code></td>
+<td><code>count:uint</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Each <code>packed_words</code> element holds four consecutive bytes, least significant byte first.
+Byte-addressed input is contiguous. Row stride and camera-container decoding are
+the caller's responsibility. Format parameters are:</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col"><code>packing</code></th>
+<th scope="col">Sample storage</th>
+<th scope="col">Group constraint</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Bayer8: one byte per sample</td>
+<td>Any sample count, use depth 8</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Bayer16: two little-endian bytes per sample</td>
+<td>Any sample count, supported depths 1–16</td>
+</tr>
+<tr>
+<td>2</td>
+<td>MIPI RAW10: four samples in five bytes</td>
+<td>Count divisible by four, use depth 10</td>
+</tr>
+<tr>
+<td>3</td>
+<td>MIPI RAW12: two samples in three bytes</td>
+<td>Count divisible by two, use depth 12</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>pattern</code> selects 0=RGGB, 1=BGGR, 2=GRBG, or 3=GBRG. Dimensions are positive and
+<code>count=width*height</code>. Demosaicing keeps each sensor's measured channel and averages
+nearby sites for the other channels, with explicit clamp-to-edge handling. Output
+RGB is normalized by <code>(2^bit_depth)-1</code> and alpha is one. Luminance uses
+<code>0.2126*R + 0.7152*G + 0.0722*B</code> on linear RGB. Transfer-function decoding, black
+level correction, and color calibration belong to upstream processing.</p>
+<p>Unpack and luminance use <code>(64,1,1)</code> local groups. Demosaicing uses <code>(8,8,1)</code>:
+dispatch <code>extent((width+7)/8,(height+7)/8)</code>.</p>
+<h2 id="gaussian-sobel-and-harris-corners">Gaussian, Sobel, and Harris corners</h2>
+<p><a href="source/examples/vision.cpp.html">example_vision</a> builds a six-stage path:
+Gaussian horizontal → Gaussian vertical → Sobel → tensor → Harris response →
+nonmaximum suppression. A direct 25-tap reference verifies the two-pass Gaussian,
+coefficient-table references verify gradients and Harris values, and the final
+mask identifies four known corners of a bright square.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Shader factory</th>
+<th scope="col">Input → output element type</th>
+<th scope="col">Additional uniforms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="source/examples/shaders/gaussian_horizontal.cpp.html">gaussian_horizontal_kernel</a></td>
+<td><code>float</code> → <code>float</code></td>
+<td><code>width:uint</code>, <code>height:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/gaussian_vertical.cpp.html">gaussian_vertical_kernel</a></td>
+<td><code>float</code> → <code>float</code></td>
+<td><code>width:uint</code>, <code>height:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/sobel.cpp.html">sobel_kernel</a></td>
+<td><code>float</code> → <code>vec2(dx,dy)</code></td>
+<td><code>width:uint</code>, <code>height:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/harris_tensor.cpp.html">harris_tensor_kernel</a></td>
+<td><code>vec2</code> → <code>vec4(dx²,dx*dy,dy²,0)</code></td>
+<td><code>count:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/harris_response.cpp.html">harris_response_kernel</a></td>
+<td><code>vec4</code> → <code>float</code></td>
+<td><code>width:uint</code>, <code>height:uint</code>, <code>harris_k:float</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/nonmax.cpp.html">nonmax_kernel</a></td>
+<td><code>float</code> → <code>uint</code> mask</td>
+<td><code>width:uint</code>, <code>height:uint</code>, <code>threshold:float</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Every stage uses ports <code>input_values</code> and <code>output_values</code>, and local groups
+<code>(64,1,1)</code>. Gaussian passes use the normalized five-tap binomial kernel
+<code>[1,4,6,4,1]/16</code>. Sobel derivatives are divided by eight. Harris response smooths
+the symmetric structure tensor with the normalized 3×3 outer product of
+<code>[1,2,1]</code>, then computes <code>det(M)-harris_k*trace(M)^2</code>.</p>
+<p>Nonmaximum suppression keeps responses strictly above the threshold and rejects
+a pixel when a 3×3 neighbor is greater. Equal-valued ties retain the smallest
+row-major pixel index. The output is zero or one per pixel. Neighborhoods use
+clamp-to-edge sampling, with separate immutable input buffers for each stage.</p>
+<h2 id="dynamic-2d-and-3d-convolution">Dynamic 2D and 3D convolution</h2>
+<p><a href="source/examples/spectral.cpp.html">example_spectral</a> includes two linked 2D filters and a
+three-stage X/Y/Z volume filter. Coefficients and kernel sizes can be rebound
+between runs. Both shaders perform true convolution with reversed coefficient
+offsets: sample <code>p + floor(kernel_size/2) - coefficient_position</code>. Borders clamp
+to the nearest input sample.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Shader factory</th>
+<th scope="col">Inputs → output</th>
+<th scope="col">Uniforms and local size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="source/examples/shaders/convolution2d.cpp.html">convolution2d_kernel</a></td>
+<td><code>input_values:vec2</code>, <code>coefficients:float</code> → <code>output_values:vec2</code></td>
+<td><code>dimensions:uvec2</code>, <code>kernel_size:uvec2</code>, <code>(8,8,1)</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/convolution3d.cpp.html">convolution3d_kernel</a></td>
+<td><code>input_values:float</code>, <code>coefficients:float</code> → <code>output_values:float</code></td>
+<td><code>dimensions:uvec3</code>, <code>kernel_size:uvec3</code>, <code>(4,4,4)</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Dimensions and kernel sizes must be positive. Allocate enough input, output, and
+coefficient elements for their products. Index order is x fastest, then y, then
+z. Two-dimensional filtering applies the same real coefficients to both <code>vec2</code>
+channels. Those channels can also represent the real and imaginary parts of a
+complex sample. A scalar image can use an imaginary channel initialized to zero.</p>
+<h2 id="complex-separable-2d-fourier-transforms">Complex separable 2D Fourier transforms</h2>
+<p><a href="source/examples/shaders/dft_rows.cpp.html">dft_rows_kernel</a> and
+<a href="source/examples/shaders/dft_columns.cpp.html">dft_columns_kernel</a> read <code>input_values:vec2</code>
+and write <code>output_values:vec2</code>, with uniforms <code>dimensions:uvec2</code>,
+<code>direction:float</code>, and <code>normalization:float</code>. Both use <code>(8,8,1)</code> local groups.
+<code>vec2(real,imaginary)</code> represents a complex number.</p>
+<p>Use direction <code>-1.f</code> and normalization <code>1.f</code> for both forward stages. For an
+inverse transform, use direction <code>1.f</code>, normalization <code>1.f/width</code> for rows, and
+<code>1.f/height</code> for columns. The example checks the forward result against an
+independent double-precision complex 2D transform and checks inverse
+reconstruction.</p>
+<p>This direct DFT has cost <code>O(width*height*(width+height))</code>. It serves small two-dimensional transforms and portable numerical checks. The <a href="signals.html">signal guide</a> provides the radix-two FFT for longer one-dimensional blocks.</p>
+<h2 id="lossless-tiled-run-length-compression">Lossless tiled run-length compression</h2>
+<p><a href="source/examples/imaging.cpp.html">example_imaging</a> also checks exact reconstruction of
+seeded random runs, including a partial final tile. Four independent dispatch
+stages build and consume a compact stream of unsigned <code>(value,run_length)</code> pairs:</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Shader factory</th>
+<th scope="col">Ports</th>
+<th scope="col">Uniforms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="source/examples/shaders/rle_count.cpp.html">rle_count_kernel</a></td>
+<td><code>values:uint</code> → <code>sizes:uint</code></td>
+<td><code>count:uint</code>, <code>block_size:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_offsets.cpp.html">rle_offsets_kernel</a></td>
+<td><code>sizes:uint</code> → <code>offsets:uint</code></td>
+<td><code>blocks:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_encode.cpp.html">rle_encode_kernel</a></td>
+<td><code>values:uint</code>, <code>offsets:uint</code> → <code>encoded:uint</code></td>
+<td><code>count:uint</code>, <code>block_size:uint</code></td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_decode.cpp.html">rle_decode_kernel</a></td>
+<td><code>encoded:uint</code>, <code>offsets:uint</code> → <code>restored:uint</code></td>
+<td><code>count:uint</code>, <code>block_size:uint</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>count</code> and <code>block_size</code> are positive, and <code>blocks=ceil(count/block_size)</code>. Allocate <code>sizes</code>
+with <code>blocks</code> words, <code>offsets</code> with <code>blocks+1</code> words, and <code>encoded</code> with worst-case
+capacity <code>2*count</code> words. The actual compact length is <code>offsets[blocks]</code> words.
+Include the offset table when accounting for compressed size. The prefix stage
+uses one invocation and is intended for small tile tables. Other stages use
+local groups <code>(64,1,1)</code>, one invocation per tile.</p>
+<p>This lossless word codec compresses repeated values and can expand unrelated random values. Feed the decoder a valid stream and offset metadata produced by the matching encoder.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#start-with-a-filter">Start with a filter</a></li><li><a href="#bayer-unpacking-demosaicing-and-luminance">Bayer unpacking, demosaicing, and luminance</a></li><li><a href="#gaussian-sobel-and-harris-corners">Gaussian, Sobel, and Harris corners</a></li><li><a href="#dynamic-2d-and-3d-convolution">Dynamic 2D and 3D convolution</a></li><li><a href="#complex-separable-2d-fourier-transforms">Complex separable 2D Fourier transforms</a></li><li><a href="#lossless-tiled-run-length-compression">Lossless tiled run-length compression</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

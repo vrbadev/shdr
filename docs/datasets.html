@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Run pipelines on public data"><title>Run pipelines on public data · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="run-pipelines-on-public-data">Run pipelines on public data</h1>
+<p><code>example_real_data</code> runs processing pipelines on recorded images, waveforms, events and handwritten digits. The prepared files live in <a href="source/examples/data/readme.md.html">examples/data</a>. Ordinary C++ builds and application runs read those binary files directly.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Check the supplied local input and model files.</span>
+python3<span class="tok-w"> </span>scripts/prepare_datasets.py<span class="tok-w"> </span>--verify
+<span class="tok-c1"># Run every real-data case on the CPU.</span>
+./build/example_real_data
+<span class="tok-c1"># Run the same cases with an ES 3.1 headless device.</span>
+./build/example_real_data<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<p>GPU runs start from the same inputs and mutable state as their CPU references.
+They compare complete outputs, including intermediate resources and learned
+parameters. The individual examples also retain their independent numerical
+references and seeded edge cases.</p>
+<h2 id="know-what-each-input-measures">Know what each input measures</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Public input</th>
+<th scope="col">Processing cases</th>
+<th scope="col">What is checked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NASA Blue Marble RGB image</td>
+<td>Linked buffers, mixed CPU/GPU stages, asynchronous jobs, image blur, corners, 2D convolution and Fourier transforms</td>
+<td>Complete backend output comparisons, independent arithmetic and blur references, inverse reconstruction</td>
+</tr>
+<tr>
+<td>Bayer samples derived from the NASA image</td>
+<td>Four Bayer phases and four packing formats, followed by interpolation and luminance</td>
+<td>Exact packing round trips and CPU/GPU color results</td>
+</tr>
+<tr>
+<td>NASA RGB byte values</td>
+<td>Tiled RLE encoding and decoding</td>
+<td>Exact reconstruction of all original values, with actual encoded size reported</td>
+</tr>
+<tr>
+<td>PhysioNet two-channel ECG prefix</td>
+<td>Batched 1D FFT, inverse FFT, frequency masks, windows, FIR and biquad filters</td>
+<td>Backend comparisons and waveform reconstruction</td>
+</tr>
+<tr>
+<td>Prophesee laser EVT3 recording prefix</td>
+<td>Ordered decoding, compact CD events and normal optical flow</td>
+<td>Exact decoded records, independent temporal-plane fits and backend comparisons</td>
+</tr>
+<tr>
+<td>MNIST digit image stack</td>
+<td>3D convolution</td>
+<td>Every output sample compared between backends</td>
+</tr>
+<tr>
+<td>MNIST zero/one training samples</td>
+<td>Small ANN, CNN and transformer training and prediction</td>
+<td>Falling mini-batch loss and complete parameter, gradient and prediction comparisons</td>
+</tr>
+<tr>
+<td>Official MNIST test images and trained LeNet weights</td>
+<td>Seven-stage deeper classifier inference</td>
+<td>Original test labels and independent PyTorch reference logits</td>
+</tr>
+</tbody>
+</table></div>
+<p>The Bayer input is a color mosaic sampled from the published RGB image. The 3D input stacks digit images along a depth axis. These cases measure packing, interpolation, convolution and backend agreement. The satellite image supports numerical corner checks, and the event recording supports decoder and temporal-plane-fit checks. The ECG case measures signal-processing behavior. The separate digit classifier uses held-out labels to measure classification accuracy.</p>
+<p>The prepared EVT3 prefix decodes to 21,950 CD records. With a three-pixel radius, 128-event lookback and 10,000-microsecond time window, 500 records have enough suitable neighbors for accepted normal-flow fits. These counts measure decoded output and fit acceptance.</p>
+<p>RLE can expand a photograph's byte values. Its exact round trip remains useful
+even when its encoded size is larger. The small neural training cases fit one
+selected training mini-batch. Their reported loss is a training measure. The
+separate LeNet evaluation uses held-out test labels.</p>
+<h2 id="reproduce-the-prepared-files">Reproduce the prepared files</h2>
+<p>Preparation checks pinned input files before decoding them. Large recordings use bounded HTTP byte ranges. The <a href="source/examples/data/readme.md.html">data reference</a> describes the source downloads, preprocessing and file layouts.</p>
+<p>Use the supplied inputs to reproduce the examples, or follow the documented layouts to supply your own data. Run <code>python3 scripts/prepare_datasets.py --verify</code> to check the prepared inputs and model files before evaluation.</p>
+<p>Install Pillow for the JPEG preparation step, then run:</p>
+<pre><code class="language-sh"><span class="tok-c1"># Download only missing pinned public inputs and prepare the small fixtures.</span>
+python3<span class="tok-w"> </span>scripts/prepare_datasets.py<span class="tok-w"> </span>--fetch
+<span class="tok-c1"># Also unpack all 10,000 official MNIST test images into the build cache.</span>
+python3<span class="tok-w"> </span>scripts/prepare_datasets.py<span class="tok-w"> </span>--full-mnist
+</code></pre>
+<p>Later preparation can reuse <code>build/datasets/upstream</code>. Use <code>--fetch</code> when downloading missing source files. <code>--cache</code> and <code>--output</code> select other directories. <code>--verify</code> checks prepared files using Python's standard library and the supplied source records. JPEG decoder versions can affect the final RGB values, so use the supplied prepared image for matching inputs across systems.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Prepared file</th>
+<th scope="col">Layout and transformation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>earth_rgb.bin</code></td>
+<td>64×64 RGB8 pixels in row-major interleaved order. Decode the checked 800×800 JPEG, then sample each destination pixel's source center with nearest-neighbor indexing</td>
+</tr>
+<tr>
+<td><code>signal_ecg.bin</code></td>
+<td>Two arrays of 2048 little-endian float32 samples, MLII followed by V5, at 360 Hz. Decode WFDB format 212 and apply <code>(ADC - 1024) / 200</code> millivolts</td>
+</tr>
+<tr>
+<td><code>evt3_words.bin</code></td>
+<td>First 32768 little-endian uint16 words after the original 166-byte RAW header. Encoded words and absolute timestamps are retained</td>
+</tr>
+<tr>
+<td><code>evt3_header.txt</code></td>
+<td>Exact original ASCII header from that recording prefix</td>
+</tr>
+<tr>
+<td><code>mnist_train.bin</code> / <code>mnist_train_labels.bin</code></td>
+<td>First 64 training instances each of zero and one, retained in original training order. Raw 28×28 image bytes and matching labels, with original indices recorded</td>
+</tr>
+<tr>
+<td><code>mnist_test.bin</code> / <code>mnist_labels.bin</code></td>
+<td>First 512 official test images and matching labels, retained in original test order</td>
+</tr>
+</tbody>
+</table></div>
+<p>The image resize uses source coordinate <code>floor((2*destination_index + 1) * source_size / (2*64))</code> on each axis and retains the decoded RGB transfer values. Runtime image processing normalizes bytes and applies its documented luminance weights. Neural inputs are divided by 255, and LeNet supplies a two-pixel zero border.</p>
+<p>The small ANN uses horizontal stroke spread and outer-versus-center ink as its
+two features. The small CNN samples an 8×8 image with center-nearest indexing.
+The transformer uses four tokens, each containing four means of 7×7 pixel
+patches. These feature transformations are in
+<a href="source/examples/real_data.cpp.html">real_data.cpp</a>. They retain the original binary
+digit labels.</p>
+<h2 id="evaluate-the-full-digit-test-split">Evaluate the full digit test split</h2>
+<p>Full MNIST preparation writes <code>mnist_full.bin</code> and <code>mnist_full_labels.bin</code> into
+<code>build/datasets</code>. The evaluator accepts that directory for its LeNet test case:</p>
+<pre><code class="language-sh"><span class="tok-c1"># Evaluate all 10,000 held-out images with native CPU inference.</span>
+<span class="tok-nv">SHDR_FULL_MNIST_DIR</span><span class="tok-o">=</span>build/datasets<span class="tok-w"> </span>./build/example_real_data
+<span class="tok-c1"># Evaluate the same complete test split with native GPU inference.</span>
+<span class="tok-nv">SHDR_FULL_MNIST_DIR</span><span class="tok-o">=</span>build/datasets<span class="tok-w"> </span>./build/example_real_data<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<p>Other real-data cases still use their small fixtures. <code>SHDR_DATA_DIR</code> selects an
+alternate directory for those files and the model bundle. The classifier reports
+the number of correct original labels and the greatest normalized difference
+from the independent framework logits. These evaluation timings include batch
+construction, comparisons and result reads. They have a different scope from
+the resident-pipeline <a href="results.html#benchmarks">benchmark table</a>.</p>
+<p>The recorded full evaluations produced 9778 correct labels out of 10,000, or
+97.78%, on the Ryzen CPU and llvmpipe, the Core i7 CPU and Iris Xe, and the Pi 5
+CPU and V3D. Every native score matched the independent framework reference
+within a maximum normalized error of 4.57699e-6. The
+<a href="results.html">complete results</a> record each backend's exact error,
+completed evaluation time and model and input fingerprints.</p>
+<h2 id="credit-and-data-terms">Credit and data terms</h2>
+<p>The <a href="https://science.nasa.gov/resource/blue-marble-2002/">NASA Blue Marble 2002 page</a>
+credits NASA's Earth Observatory. It is a composite of actual MODIS satellite
+observations. The example retains that credit and uses it for a factual
+processing demonstration under the
+<a href="https://www.nasa.gov/nasa-brand-center/images-and-media/">NASA media guidelines</a>.</p>
+<p>The ECG source is George Moody and Roger Mark's
+<a href="https://physionet.org/content/mitdb/1.0.0/">MIT-BIH Arrhythmia Database, version 1.0.0</a>,
+record 100, DOI 10.13026/C2F305. Its data terms are the
+<a href="https://opendatacommons.org/licenses/by/1-0/">Open Data Commons Attribution License 1.0</a>.
+The retained prefix contains the first 2048 sample pairs from the two recorded
+leads, with calibration taken from the original header.</p>
+<p>The laser recording is from the official
+<a href="https://docs.prophesee.ai/stable/datasets.html">Prophesee sample recordings</a>.
+That collection identifies its sample files as
+<a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.
+The fixture uses an exact prefix of its Gen4.1 EVT3 RAW recording.</p>
+<p>MNIST is credited to Yann LeCun, Corinna Cortes and Christopher J. C. Burges. The <a href="https://github.com/cvdfoundation/mnist">CVDF mirror</a> records the author's permission to host the original files. Consult that permission record and the <a href="http://yann.lecun.com/exdb/mnist/">original author page</a> for the mirrored archives' terms. The separately hosted <a href="https://huggingface.co/datasets/ylecun/mnist/raw/main/README.md">MNIST dataset card</a> labels its copy MIT. The source records retain each copy's stated terms.</p>
+<p>The model weights and framework logits are generated by
+<a href="source/scripts/train_lenet.py.html">train_lenet.py</a>. Their settings, input fingerprints,
+held-out metrics and output fingerprints are in
+<a href="source/scripts/data_sources.py.html">training provenance</a>. The
+<a href="neural.html#run-a-lenet-style-digit-classifier">neural guide</a> explains the model
+architecture and optional preparation dependencies.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#know-what-each-input-measures">Know what each input measures</a></li><li><a href="#reproduce-the-prepared-files">Reproduce the prepared files</a></li><li><a href="#evaluate-the-full-digit-test-split">Evaluate the full digit test split</a></li><li><a href="#credit-and-data-terms">Credit and data terms</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

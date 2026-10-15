@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Generate standalone native GLSL inference and analytic-gradient examples.
+
+Both emitted shaders contain the same four-token transformer function and are
+independently compilable. Use --check to compare them with their shared template.
+"""
+import argparse  # Read command-line options and show help.
+from pathlib import Path  # Build paths and read or write files.
+
+ROOT = Path(__file__).resolve().parents[1]  # Find the checkout containing the maintained source files.
+# Shared forward-mode derivative functions.
+BODY = r"""
+
+// Each vec2 carries a value and one analytic parameter derivative.
+vec2 ad_mul(vec2 a, vec2 b) { // Apply the product rule to values and their partial derivatives.
+    return vec2(a.x * b.x, a.y * b.x + a.x * b.y); // Keep the value product and both derivative contributions.
+} // End the product-rule helper.
+vec2 ad_div(vec2 a, vec2 b) { // Apply the quotient rule to one partial derivative.
+    return vec2(a.x / b.x, (a.y * b.x - a.x * b.y) / (b.x * b.x)); // Divide values and propagate the numerator and denominator derivatives.
+} // End the quotient-rule helper.
+vec2 ad_exp(vec2 a) { // Differentiate the exponential using its computed value.
+    float value = exp(a.x); // Compute the scalar value once before propagating its derivative.
+    return vec2(value, value * a.y); // Multiply the input derivative by the exponential value.
+} // End the exponential helper.
+vec2 ad_log(vec2 a) { // Differentiate the natural logarithm.
+    return vec2(log(a.x), a.y / a.x); // Divide the input derivative by its value.
+} // End the logarithm helper.
+vec2 ad_invsqrt(vec2 a) { // Differentiate inverse square root for the positive normalization input.
+    float value = inversesqrt(a.x); // Compute the scalar value once before propagating its derivative.
+    return vec2(value, -0.5 * value * value * value * a.y); // Use the derivative of a power with exponent minus one half.
+} // End the inverse-square-root helper.
+vec2 ad_relu(vec2 a) { // Keep the derivative only where the activation is positive.
+    return a.x > 0.0 ? a : vec2(0.0); // Use a zero value and derivative on the inactive branch.
+} // End the ReLU helper.
+vec2 weight(uint index, uint seed) { // Read a parameter and seed its selected partial derivative.
+    return vec2(parameters[index], index == seed ? 1.0 : 0.0); // Seed one for this parameter and zero for every other parameter.
+} // End the parameter derivative seed helper.
+
+// Parameter ranges: position0:16,Q16:32,K32:48,V48:64,O64:80,
+// RMSscale80:84,FFN1weight84:100,bias100:104,FFN2weight104:120,
+// bias120:124,classifierweight124:132,bias132:134.
+// The returned vec4 stores two logits followed by their two derivatives.
+vec4 transformer(uint row, uint seed) { // Evaluate two classifier logits and one parameter derivative.
+    vec2 x[16]; // Hold four tokens after adding their learned positional features.
+    vec2 q[16]; // Hold the four query vectors and their derivatives.
+    vec2 k[16]; // Hold the four key vectors and their derivatives.
+    vec2 v[16]; // Hold the four value vectors and their derivatives.
+    vec2 attended[16]; // Hold attention output after its projection and residual.
+    vec2 normalized[16]; // Hold each normalized feature and its derivative.
+    vec2 features[16]; // Hold the feed-forward output after its residual.
+    for (uint i = 0u; i < 16u; ++i) // Add learned positions to all sixteen input features.
+        x[i] = vec2(inputs[row * 16u + i], 0.0) + weight(i, seed); // Add the learned position to this input value.
+    for (uint token = 0u; token < 4u; ++token) // Project each of the four tokens into query, key and value features.
+        for (uint c = 0u; c < 4u; ++c) { // Accumulate query, key and value matrix products.
+            vec2 qvalue = vec2(0.0); // Start the query dot product at zero.
+            vec2 kvalue = vec2(0.0); // Start the key dot product at zero.
+            vec2 vvalue = vec2(0.0); // Start the value dot product at zero.
+            for (uint j = 0u; j < 4u; ++j) { // Accumulate query, key and value matrix products.
+                qvalue += ad_mul(x[token * 4u + j], weight(16u + j * 4u + c, seed)); // Accumulate the query projection and its derivative.
+                kvalue += ad_mul(x[token * 4u + j], weight(32u + j * 4u + c, seed)); // Accumulate the key projection and its derivative.
+                vvalue += ad_mul(x[token * 4u + j], weight(48u + j * 4u + c, seed)); // Accumulate the value projection and its derivative.
+            } // The query, key and value dot products are complete.
+            q[token * 4u + c] = qvalue; // Store the projected query feature.
+            k[token * 4u + c] = kvalue; // Store the projected key feature.
+            v[token * 4u + c] = vvalue; // Store the projected value feature.
+        } // All projected token features are now stored.
+    for (uint token = 0u; token < 4u; ++token) { // Evaluate this token's attention and feed-forward features.
+        vec2 scores[4]; // Keep one query-key score for each source token.
+        vec2 probabilities[4]; // Keep exponentiated attention scores before normalization.
+        float maximum = -1000000000.0; // Find a score shift that prevents exponential overflow.
+        for (uint source = 0u; source < 4u; ++source) { // Create an attention score for every source token.
+            scores[source] = vec2(0.0); // Start this scaled query-key dot product at zero.
+            for (uint c = 0u; c < 4u; ++c) // Sum the query-key product across four feature channels.
+                scores[source] += ad_mul(q[token * 4u + c], k[source * 4u + c]) * 0.5; // Accumulate the scaled query-key dot product.
+            maximum = max(maximum, scores[source].x); // Retain the largest attention score for stable softmax.
+        } // Every source token now has an attention score.
+        vec2 total = vec2(0.0); // Accumulate the denominator of the softmax.
+        for (uint source = 0u; source < 4u; ++source) { // Exponentiate shifted scores for the softmax denominator.
+            probabilities[source] = ad_exp(scores[source] - vec2(maximum, 0.0)); // Keep the shifted exponential and its derivative.
+            total += probabilities[source]; // Sum the exponentials for probability normalization.
+        } // The softmax denominator now includes every source score.
+        vec2 context[4]; // Combine source value vectors using their attention probabilities.
+        for (uint c = 0u; c < 4u; ++c) { // Build each channel of the attention value mixture.
+            context[c] = vec2(0.0); // Start this output feature mixture at zero.
+            for (uint source = 0u; source < 4u; ++source) // Mix source value vectors with their normalized attention probabilities.
+                context[c] += ad_mul(ad_div(probabilities[source], total), v[source * 4u + c]); // Weight source values by their normalized attention probabilities.
+        } // The attention mixture now contains four feature values.
+        for (uint c = 0u; c < 4u; ++c) { // Project attention output and preserve the input residual.
+            attended[token * 4u + c] = x[token * 4u + c]; // Start with the input token as a residual connection.
+            for (uint j = 0u; j < 4u; ++j) // Apply the learned attention output matrix to this feature.
+                attended[token * 4u + c] += ad_mul(context[j], weight(64u + j * 4u + c, seed)); // Add the learned attention output projection.
+        } // The attention projection and residual are complete.
+        vec2 square = vec2(0.00001, 0.0); // Start the mean squared feature value with a small positive epsilon.
+        for (uint c = 0u; c < 4u; ++c) // Accumulate the mean squared feature value for RMS normalization.
+            square += ad_mul(attended[token * 4u + c], attended[token * 4u + c]) * 0.25; // Add one quarter of this squared feature to the RMS estimate.
+        vec2 inverse = ad_invsqrt(square); // Compute the inverse RMS value and its derivative.
+        for (uint c = 0u; c < 4u; ++c) // Apply inverse RMS and the learned channel scale.
+            normalized[token * 4u + c] = // Scale the normalized feature with its learned RMS parameter.
+                ad_mul(ad_mul(attended[token * 4u + c], inverse), weight(80u + c, seed)); // Propagate both the inverse RMS and learned scale derivatives.
+        vec2 hidden[4]; // Hold four feed-forward hidden activations.
+        for (uint c = 0u; c < 4u; ++c) { // Evaluate each feed-forward hidden feature.
+            hidden[c] = weight(100u + c, seed); // Start the hidden neuron with its learned bias.
+            for (uint j = 0u; j < 4u; ++j) // Apply the first feed-forward matrix to normalized features.
+                hidden[c] += ad_mul(normalized[token * 4u + j], weight(84u + j * 4u + c, seed)); // Accumulate normalized input through the first feed-forward matrix.
+            hidden[c] = ad_relu(hidden[c]); // Apply the ReLU value and derivative together.
+        } // The four hidden features now include ReLU derivatives.
+        for (uint c = 0u; c < 4u; ++c) { // Start each feed-forward output with its residual and bias.
+            features[token * 4u + c] = normalized[token * 4u + c] + weight(120u + c, seed); // Start the residual output with its bias and normalized input.
+            for (uint j = 0u; j < 4u; ++j) // Project the hidden activations through the second feed-forward matrix.
+                features[token * 4u + c] += ad_mul(hidden[j], weight(104u + j * 4u + c, seed)); // Add the second feed-forward matrix projection.
+        } // The second feed-forward projection and residual are complete.
+    } // This token now has its final learned features.
+    vec2 pooled[4]; // Average token features before classification.
+    for (uint c = 0u; c < 4u; ++c) { // Mean-pool each feature across the four tokens.
+        pooled[c] = vec2(0.0); // Start this pooled feature at zero.
+        for (uint token = 0u; token < 4u; ++token) // Average this feature across the four token outputs.
+            pooled[c] += features[token * 4u + c] * 0.25; // Add one quarter of this token feature.
+    } // All token features have been mean-pooled.
+    vec2 logits[2]; // Hold the two class scores and their derivatives.
+    for (uint c = 0u; c < 2u; ++c) { // Build each of the two classifier scores.
+        logits[c] = weight(132u + c, seed); // Start the classifier score with its learned bias.
+        for (uint j = 0u; j < 4u; ++j) // Apply the classifier matrix to the pooled feature values.
+            logits[c] += ad_mul(pooled[j], weight(124u + j * 2u + c, seed)); // Accumulate pooled features through the classifier matrix.
+    } // Both class scores and their partials are complete.
+    return vec4(logits[0].x, logits[1].x, logits[0].y, logits[1].y); // Return both logits followed by their two partial derivatives.
+} // The shared transformer forward pass is complete.
+
+// Stable two-class cross entropy. The maximum shift cancels analytically.
+vec2 cross_entropy(vec4 logits, uint label) { // Evaluate the selected class loss and its derivative.
+    float shift = max(logits.x, logits.y); // Use the larger logit as a safe exponential shift.
+    vec2 first = vec2(logits.x, logits.z); // Keep the first class value or its shifted exponential.
+    vec2 second = vec2(logits.y, logits.w); // Keep the second class value or its shifted exponential.
+    vec2 total = ad_exp(first - vec2(shift, 0.0)) + ad_exp(second - vec2(shift, 0.0)); // Accumulate the denominator of the softmax.
+    return ad_log(total) + vec2(shift, 0.0) - (label == 0u ? first : second); // Subtract the selected class score from the stable log-sum-exp.
+} // End the stable cross-entropy helper.
+"""
+
+# Common model input declarations.
+PREAMBLE = r"""
+// Generated by scripts/generate_transformer.py. Edit its shared function body.
+// Four-token attention, RMS normalization, feed-forward residual and classifier.
+#ifdef __cplusplus // Include the C++ runtime only for CPU compilation.
+#include "shdr.h" // Use the portable math types and kernel registration API.
+#endif // Keep GPU compilation free of C++ header contents.
+layout(local_size_x = 64) in; // Process independent sample or parameter indices in groups of 64.
+layout(std430, binding = 0) readonly buffer Inputs { // Declare the readonly model resource named by this block.
+    float inputs[]; // Read sixteen feature values for each four-token sample.
+}; // Close the input feature storage block.
+layout(std430, binding = 1) readonly buffer Parameters { // Declare the readonly model resource named by this block.
+    float parameters[]; // Read all 134 trainable parameter values.
+}; // Close the model parameter storage block.
+layout(std430, binding = 2) readonly buffer Labels { // Declare the readonly model resource named by this block.
+    uint labels[]; // Read the binary target class for each sequence.
+}; // Close the target label storage block.
+uniform uint batch_count; // Limit every dispatch to the declared number of sequences.
+"""
+
+SUFFIXES = {  # Give inference and differentiation separate entry points.
+    'transformer_infer.cpp': r"""
+
+void main() { // Write the result belonging to this compute invocation.
+    uint row = gl_GlobalInvocationID.x; // Locate this sample in the batch.
+    if (row >= batch_count) // Ignore invocations outside the allocated batch.
+        return; // Stop padding invocations before processing a sample.
+    vec4 logits = transformer(row, 4294967295u); // Hold the two class scores and their derivatives.
+    float shift = max(logits.x, logits.y); // Use the larger logit as a safe exponential shift.
+    float first = exp(logits.x - shift); // Keep the first class value or its shifted exponential.
+    float second = exp(logits.y - shift); // Keep the second class value or its shifted exponential.
+    float total = first + second; // Accumulate the denominator of the softmax.
+    predictions[row] = vec4(first / total, // Publish both probabilities, the loss and the predicted class.
+                            second / total, // Publish the probability of class one.
+                            cross_entropy(logits, labels[row]).x, // Publish the selected class loss.
+                            logits.y > logits.x ? 1.0 : 0.0); // Select the class with the larger score.
+} // Finish this prediction invocation.
+""",
+    'transformer_gradient.cpp': r"""
+
+void main() { // Write the result belonging to this compute invocation.
+    uint index = gl_GlobalInvocationID.x; // Locate this sample-and-parameter gradient pair.
+    uint row = index / 134u; // Locate this sample in the batch.
+    uint parameter = index % 134u; // Select one of the 134 trainable parameters.
+    if (row >= batch_count) // Ignore invocations outside the allocated batch.
+        return; // Stop padding invocations before processing a sample.
+    // One invocation evaluates one exact analytic partial derivative.
+    gradients[index] = cross_entropy(transformer(row, parameter), labels[row]).y; // Publish this exact analytic sample-and-parameter derivative.
+} // Finish this parameter gradient invocation.
+""",
+}  # Both shaders use the same forward and loss functions.
+
+
+def main():  # Read options and run this command-line tool.
+    parser = argparse.ArgumentParser(description=__doc__)  # Describe the command and its supported options.
+    parser.add_argument("--check", action="store_true")  # Compare generated files in check mode.
+    arguments = parser.parse_args()  # Read whether generated files should be checked or written.
+    stale = []  # Collect generated files that need regeneration.
+    for name, suffix in SUFFIXES.items():  # Generate both inference and gradient shader files.
+        if name.endswith("infer.cpp"):  # Give inference one output vector per sample.
+            port = r"""
+layout(std430, binding = 3) writeonly buffer Predictions { // Declare the inference output.
+    vec4 predictions[]; // Store class probabilities, loss and the selected class.
+}; // Close the prediction output block.
+"""
+        else:  # Give differentiation one output scalar per sample and parameter.
+            port = r"""
+layout(std430, binding = 3) writeonly buffer Gradients { // Declare the analytic derivative output.
+    float gradients[]; // Store one partial derivative for each sample and parameter.
+}; // Close the gradient output block.
+"""
+        source = PREAMBLE + port + BODY + suffix  # Join declarations, the shared forward body and the selected entry point.
+        destination = ROOT / "examples" / "shaders" / name  # Locate the generated shader file.
+        if arguments.check:  # Compare generated bytes with the existing source files.
+            if not destination.exists() or destination.read_text() != source:  # Detect a missing generated file or a byte difference.
+                stale.append(name)  # Remember this shader needs regeneration.
+        else:  # Write the generated files in output mode.
+            destination.write_text(source)  # Update this shader from the shared transformer template.
+    if stale:  # Report generated files that differ from their source template.
+        raise SystemExit("generated transformer shaders are stale: " + ", ".join(stale))  # List the shader files that need regeneration.
+
+
+if __name__ == "__main__":  # Run only when this file is invoked as a command.
+    main()  # Read options and run the requested checks.

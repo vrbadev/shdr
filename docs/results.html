@@ -1,0 +1,3780 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Measured CPU and OpenGL compute results, complete test records, full MNIST evaluation and downloadable scientific figures."><title>Measured results · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><style>.report-figure{margin:1.6rem 0;padding:1rem;border:1px solid var(--border);border-radius:12px;background:white}.report-figure img{display:block;width:100%;height:auto}.report-figure figcaption{padding-top:.8rem;color:#46546a;font-size:.94rem}.metric-value{font-size:2rem;font-weight:750;display:block}details.log-record{margin:1rem 0}details.log-record pre{max-height:36rem;overflow:auto}.hash{font-family:ui-monospace,monospace;overflow-wrap:anywhere}.result-note{font-size:.92rem;color:var(--muted)}.compact-table td,.compact-table th{font-size:.86rem}.report-figure a:focus-visible{outline:3px solid var(--accent)}@media print{details.log-record pre{max-height:none}.report-figure{break-inside:avoid}}</style><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html" aria-current="page">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell"><main class="page-main" id="content">
+<p class="eyebrow">Recorded results · 15 October 2026</p><h1>Measurements you can inspect</h1><p class="lead">Twenty-five completed pipeline benchmarks, six full held-out digit evaluations, and every registered test outcome. Exact tables, original outputs and downloadable vector figures sit beside the scope of each result.</p><div class="card-grid"><div class="card"><strong class="metric-value">25</strong>resident pipeline workloads</div><div class="card"><strong class="metric-value">6 × 10,000</strong>held-out digit evaluations</div><div class="card"><strong class="metric-value">0</strong>failed registered tests</div><div class="card"><strong class="metric-value">250</strong>bundled shader/profile checks</div></div><nav class="section-nav" aria-label="Results on this page"><a href="#benchmarks">Benchmarks</a><a href="#real-data">Real data and MNIST</a><a href="#tests">Every registered test</a><a href="#fixtures">Actual input figures</a><a href="#provenance">Methods and fingerprints</a></nav>
+<section id="benchmarks"><h2>Resident pipeline performance</h2><p>Configuration reports: <a href="benchmarks/amd-ryzen-5900x.html">Ryzen and llvmpipe</a>, <a href="benchmarks/intel-core-i7-1260p.html">Core i7 and Iris Xe</a>, and <a href="benchmarks/raspberry-pi-5.html">Raspberry Pi 5 and V3D</a>.</p><p>These are mean completed workload times from CMake Release builds, C++11, seed <code>12345</code>, scale <code>1</code> and twenty timed repetitions on each execution path. All graphics measurements select the ES 3.1 shader profile. Timing begins after compilation, initial uploads and warmup, and ends before final downloads. Transfers inside mixed CPU/GPU pipelines remain included.</p><div class="callout"><strong>Read the renderer label.</strong> llvmpipe executes graphics work in software on the Ryzen CPU and can use several cores. Iris Xe and V3D are hardware graphics. Ordinary C++ pipelines execute serially. The asynchronous ring uses two CPU workers.</div><p>The async row measures a completed batch of 32 dispatches through three reusable slots. A neural training row measures one mini-batch gradient/SGD update, while inference measures the complete forward pipeline. The seven-stage LeNet benchmark uses resident seeded random inputs and parameters. Its trained-model evaluation has a separate timing scope below.</p>
+<div class="table-wrap"><table id="benchmark-comparison"><caption>All 25 benchmark workloads · mean completed milliseconds</caption><thead><tr>
+<th scope="col">Pipeline</th>
+<th scope="col">Workload</th>
+<th scope="col">Ryzen CPU ms</th>
+<th scope="col">llvmpipe ms</th>
+<th scope="col">Core i7 CPU ms</th>
+<th scope="col">Iris Xe ms</th>
+<th scope="col">Pi 5 CPU ms</th>
+<th scope="col">V3D ms</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Buffer affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.300</td>
+<td>1.374</td>
+<td>0.139</td>
+<td>3.928</td>
+<td>0.516</td>
+<td>1.956</td>
+</tr>
+<tr>
+<th scope="row">Buffer/image blur</th>
+<td>128 × 128</td>
+<td>0.589</td>
+<td>1.639</td>
+<td>0.422</td>
+<td>0.054</td>
+<td>1.033</td>
+<td>0.471</td>
+</tr>
+<tr>
+<th scope="row">Borrowed image blur</th>
+<td>128 × 128</td>
+<td>0.637</td>
+<td>1.582</td>
+<td>0.299</td>
+<td>0.052</td>
+<td>0.951</td>
+<td>0.469</td>
+</tr>
+<tr>
+<th scope="row">Hybrid affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.288</td>
+<td>1.217</td>
+<td>0.145</td>
+<td>2.825</td>
+<td>0.597</td>
+<td>2.188</td>
+</tr>
+<tr>
+<th scope="row">Dynamic library stages</th>
+<td>16384 floats</td>
+<td>0.303</td>
+<td>1.463</td>
+<td>0.460</td>
+<td>2.100</td>
+<td>0.838</td>
+<td>1.968</td>
+</tr>
+<tr>
+<th scope="row">RAW10/debayer/luminance</th>
+<td>128 × 128</td>
+<td>1.078</td>
+<td>1.643</td>
+<td>1.080</td>
+<td>0.068</td>
+<td>2.466</td>
+<td>2.522</td>
+</tr>
+<tr>
+<th scope="row">2D convolution 5 x 5</th>
+<td>128 × 128 vec2</td>
+<td>1.521</td>
+<td>0.748</td>
+<td>1.140</td>
+<td>0.059</td>
+<td>3.283</td>
+<td>2.444</td>
+</tr>
+<tr>
+<th scope="row">3D convolution 3 x 3 x 3</th>
+<td>24 × 24 × 24</td>
+<td>1.503</td>
+<td>0.706</td>
+<td>1.266</td>
+<td>0.057</td>
+<td>3.156</td>
+<td>3.020</td>
+</tr>
+<tr>
+<th scope="row">Forward/inverse direct DFT</th>
+<td>32 × 32 complex</td>
+<td>1.232</td>
+<td>1.643</td>
+<td>0.892</td>
+<td>0.080</td>
+<td>2.589</td>
+<td>0.579</td>
+</tr>
+<tr>
+<th scope="row">Gaussian/Sobel/Harris/NMS</th>
+<td>128 × 128</td>
+<td>2.379</td>
+<td>3.138</td>
+<td>1.841</td>
+<td>0.089</td>
+<td>4.571</td>
+<td>2.345</td>
+</tr>
+<tr>
+<th scope="row">Lossless tiled RLE round trip</th>
+<td>65536 uints</td>
+<td>0.625</td>
+<td>1.367</td>
+<td>0.462</td>
+<td>0.248</td>
+<td>1.256</td>
+<td>1.253</td>
+</tr>
+<tr>
+<th scope="row">EVT3 event decoding</th>
+<td>65536 sixteen-bit words</td>
+<td>2.990</td>
+<td>2.222</td>
+<td>2.993</td>
+<td>0.734</td>
+<td>4.873</td>
+<td>6.988</td>
+</tr>
+<tr>
+<th scope="row">Async ring</th>
+<td>32 × 257 floats, 3 slots</td>
+<td>1.207</td>
+<td>7.759</td>
+<td>0.094</td>
+<td>0.730</td>
+<td>0.143</td>
+<td>1.976</td>
+</tr>
+<tr>
+<th scope="row">EVT3 + optical flow</th>
+<td>32 × 24 sampled plane, history 64</td>
+<td>0.393</td>
+<td>1.731</td>
+<td>0.290</td>
+<td>0.215</td>
+<td>0.640</td>
+<td>0.656</td>
+</tr>
+<tr>
+<th scope="row">ANN training</th>
+<td>32 samples, 33 parameters</td>
+<td>0.085</td>
+<td>0.520</td>
+<td>0.072</td>
+<td>0.042</td>
+<td>0.206</td>
+<td>0.114</td>
+</tr>
+<tr>
+<th scope="row">ANN inference</th>
+<td>32 samples, 33 parameters</td>
+<td>0.004</td>
+<td>0.156</td>
+<td>0.002</td>
+<td>0.015</td>
+<td>0.006</td>
+<td>0.037</td>
+</tr>
+<tr>
+<th scope="row">CNN training</th>
+<td>32 samples, 23 parameters</td>
+<td>1.615</td>
+<td>0.644</td>
+<td>1.359</td>
+<td>0.086</td>
+<td>3.254</td>
+<td>0.490</td>
+</tr>
+<tr>
+<th scope="row">CNN inference</th>
+<td>32 samples, 23 parameters</td>
+<td>0.064</td>
+<td>0.161</td>
+<td>0.054</td>
+<td>0.034</td>
+<td>0.138</td>
+<td>0.057</td>
+</tr>
+<tr>
+<th scope="row">Transformer training</th>
+<td>8 sequences, 4 tokens × 4, 134 parameters</td>
+<td>1.324</td>
+<td>0.770</td>
+<td>0.972</td>
+<td>0.284</td>
+<td>2.404</td>
+<td>0.729</td>
+</tr>
+<tr>
+<th scope="row">Transformer inference</th>
+<td>8 sequences, 4 tokens × 4, 134 parameters</td>
+<td>0.008</td>
+<td>0.171</td>
+<td>0.006</td>
+<td>0.057</td>
+<td>0.018</td>
+<td>0.055</td>
+</tr>
+<tr>
+<th scope="row">FFT forward/inverse</th>
+<td>8 × 1024 complex</td>
+<td>3.050</td>
+<td>10.656</td>
+<td>2.226</td>
+<td>0.226</td>
+<td>5.936</td>
+<td>4.174</td>
+</tr>
+<tr>
+<th scope="row">FIR low-pass</th>
+<td>8 × 2048 floats, 65 taps</td>
+<td>2.718</td>
+<td>0.772</td>
+<td>1.956</td>
+<td>0.124</td>
+<td>6.570</td>
+<td>5.499</td>
+</tr>
+<tr>
+<th scope="row">Biquad low-pass</th>
+<td>8 × 2048 floats, persistent state</td>
+<td>0.097</td>
+<td>0.233</td>
+<td>0.040</td>
+<td>0.515</td>
+<td>0.156</td>
+<td>0.691</td>
+</tr>
+<tr>
+<th scope="row">FFT band-pass</th>
+<td>8 × 1024 complex, 4-10 kHz</td>
+<td>3.219</td>
+<td>11.268</td>
+<td>2.250</td>
+<td>0.222</td>
+<td>6.153</td>
+<td>5.001</td>
+</tr>
+<tr>
+<th scope="row">LeNet classifier</th>
+<td>32 × 28 × 28, 61,706 parameters</td>
+<td>46.521</td>
+<td>7.622</td>
+<td>40.790</td>
+<td>1.756</td>
+<td>116.491</td>
+<td>136.617</td>
+</tr>
+</tbody></table></div>
+<h3>Ryzen 5900X / llvmpipe</h3>
+<figure class="report-figure"><a href="plots/benchmark-amd.svg" aria-label="Open standalone SVG: Ryzen 5900X / llvmpipe mean pipeline timings and CPU-to-graphics ratios"><img src="plots/benchmark-amd.svg" alt="Ryzen 5900X / llvmpipe mean pipeline timings and CPU-to-graphics ratios" loading="lazy"></a><figcaption>Time and ratio axes are logarithmic. A ratio above one favors the graphics path. Means are displayed to three decimal places. Ratios come from the original unrounded means, then are rounded for reporting. <a href="plots/benchmark-amd.svg" download>Download SVG</a></figcaption></figure>
+<details><summary>Exact timing and ratio table · Ryzen 5900X / llvmpipe</summary><div class="table-wrap"><table id="benchmark-amd"><caption>Ryzen 5900X / llvmpipe · 20 measured repetitions</caption><thead><tr>
+<th scope="col">Pipeline</th>
+<th scope="col">Workload</th>
+<th scope="col">CPU ms</th>
+<th scope="col">Graphics ms</th>
+<th scope="col">CPU / graphics</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Buffer affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.300</td>
+<td>1.374</td>
+<td>0.218</td>
+</tr>
+<tr>
+<th scope="row">Buffer/image blur</th>
+<td>128 x 128</td>
+<td>0.589</td>
+<td>1.639</td>
+<td>0.359</td>
+</tr>
+<tr>
+<th scope="row">Borrowed image blur</th>
+<td>128 x 128</td>
+<td>0.637</td>
+<td>1.582</td>
+<td>0.403</td>
+</tr>
+<tr>
+<th scope="row">Hybrid affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.288</td>
+<td>1.217</td>
+<td>0.237</td>
+</tr>
+<tr>
+<th scope="row">Dynamic library stages</th>
+<td>16384 floats</td>
+<td>0.303</td>
+<td>1.463</td>
+<td>0.207</td>
+</tr>
+<tr>
+<th scope="row">RAW10/debayer/luminance</th>
+<td>128 x 128</td>
+<td>1.078</td>
+<td>1.643</td>
+<td>0.656</td>
+</tr>
+<tr>
+<th scope="row">2D convolution 5 x 5</th>
+<td>128 x 128 vec2</td>
+<td>1.521</td>
+<td>0.748</td>
+<td>2.034</td>
+</tr>
+<tr>
+<th scope="row">3D convolution 3 x 3 x 3</th>
+<td>24 x 24 x 24</td>
+<td>1.503</td>
+<td>0.706</td>
+<td>2.129</td>
+</tr>
+<tr>
+<th scope="row">Forward/inverse direct DFT</th>
+<td>32 x 32 complex</td>
+<td>1.232</td>
+<td>1.643</td>
+<td>0.750</td>
+</tr>
+<tr>
+<th scope="row">Gaussian/Sobel/Harris/NMS</th>
+<td>128 x 128</td>
+<td>2.379</td>
+<td>3.138</td>
+<td>0.758</td>
+</tr>
+<tr>
+<th scope="row">Lossless tiled RLE round trip</th>
+<td>65536 uints</td>
+<td>0.625</td>
+<td>1.367</td>
+<td>0.457</td>
+</tr>
+<tr>
+<th scope="row">EVT3 event decoding</th>
+<td>65536 sixteen-bit words</td>
+<td>2.990</td>
+<td>2.222</td>
+<td>1.346</td>
+</tr>
+<tr>
+<th scope="row">Async ring</th>
+<td>32 x 257 floats, 3 slots</td>
+<td>1.207</td>
+<td>7.759</td>
+<td>0.156</td>
+</tr>
+<tr>
+<th scope="row">EVT3 + optical flow</th>
+<td>32 x 24 sampled plane, history 64</td>
+<td>0.393</td>
+<td>1.731</td>
+<td>0.227</td>
+</tr>
+<tr>
+<th scope="row">ANN training</th>
+<td>32 samples, 33 parameters</td>
+<td>0.085</td>
+<td>0.520</td>
+<td>0.164</td>
+</tr>
+<tr>
+<th scope="row">ANN inference</th>
+<td>32 samples, 33 parameters</td>
+<td>0.004</td>
+<td>0.156</td>
+<td>0.024</td>
+</tr>
+<tr>
+<th scope="row">CNN training</th>
+<td>32 samples, 23 parameters</td>
+<td>1.615</td>
+<td>0.644</td>
+<td>2.510</td>
+</tr>
+<tr>
+<th scope="row">CNN inference</th>
+<td>32 samples, 23 parameters</td>
+<td>0.064</td>
+<td>0.161</td>
+<td>0.397</td>
+</tr>
+<tr>
+<th scope="row">Transformer training</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>1.324</td>
+<td>0.770</td>
+<td>1.719</td>
+</tr>
+<tr>
+<th scope="row">Transformer inference</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>0.008</td>
+<td>0.171</td>
+<td>0.045</td>
+</tr>
+<tr>
+<th scope="row">FFT forward/inverse</th>
+<td>8 x 1024 complex</td>
+<td>3.050</td>
+<td>10.656</td>
+<td>0.286</td>
+</tr>
+<tr>
+<th scope="row">FIR low-pass</th>
+<td>8 x 2048 floats, 65 taps</td>
+<td>2.718</td>
+<td>0.772</td>
+<td>3.523</td>
+</tr>
+<tr>
+<th scope="row">Biquad low-pass</th>
+<td>8 x 2048 floats, persistent state</td>
+<td>0.097</td>
+<td>0.233</td>
+<td>0.417</td>
+</tr>
+<tr>
+<th scope="row">FFT band-pass</th>
+<td>8 x 1024 complex, 4-10 kHz</td>
+<td>3.219</td>
+<td>11.268</td>
+<td>0.286</td>
+</tr>
+<tr>
+<th scope="row">LeNet classifier</th>
+<td>32 x 28 x 28, 61,706 parameters</td>
+<td>46.521</td>
+<td>7.622</td>
+<td>6.104</td>
+</tr>
+</tbody></table></div></details>
+<details class="log-record"><summary>Complete benchmark output · Ryzen 5900X / llvmpipe</summary><p>This is the recorded benchmark output. Its EVT3 wording “packed words” counts 16-bit sensor words before two words are packed into each uint.</p><pre>Seed: 12345, iterations: 20, scale: 1.
+GPU renderer: llvmpipe (LLVM 20.1.2, 256 bits).
+Lossless RLE: 13556 payload words + 257 offset words, 4.74x size reduction.
+EVT3 compact output: 223772 events from 65536 words, five stages include state reset.
+Optical flow input: 610 seeded samples on a known temporal plane, six linked stages.
+Neural training timings measure one mini-batch gradient/SGD update, inference measures the complete forward pipeline.
+Steady-state resident timings, compilation, first uploads and final readback excluded.
+Hybrid timings include transfers between CPU and GPU stages.
+
+| Pipeline | Workload | CPU ms | GPU ms | CPU/GPU |
+| --- | --- | ---: | ---: | ---: |
+| Buffer affine/clamp/sum | 16384 floats | 0.300 | 1.374 | 0.218 |
+| Buffer/image blur | 128 x 128 | 0.589 | 1.639 | 0.359 |
+| Borrowed image blur | 128 x 128 | 0.637 | 1.582 | 0.403 |
+| Hybrid affine/clamp/sum | 16384 floats | 0.288 | 1.217 | 0.237 |
+| Dynamic library stages | 16384 floats | 0.303 | 1.463 | 0.207 |
+| RAW10/debayer/luminance | 128 x 128 | 1.078 | 1.643 | 0.656 |
+| 2D convolution 5 x 5 | 128 x 128 vec2 | 1.521 | 0.748 | 2.034 |
+| 3D convolution 3 x 3 x 3 | 24 x 24 x 24 | 1.503 | 0.706 | 2.129 |
+| Forward/inverse direct DFT | 32 x 32 complex | 1.232 | 1.643 | 0.750 |
+| Gaussian/Sobel/Harris/NMS | 128 x 128 | 2.379 | 3.138 | 0.758 |
+| Lossless tiled RLE round trip | 65536 uints | 0.625 | 1.367 | 0.457 |
+| EVT3 event decoding | 65536 packed words | 2.990 | 2.222 | 1.346 |
+| Async ring | 32 x 257 floats, 3 slots | 1.207 | 7.759 | 0.156 |
+| EVT3 + optical flow | 32 x 24 sampled plane, history 64 | 0.393 | 1.731 | 0.227 |
+| ANN training | 32 samples, 33 parameters | 0.085 | 0.520 | 0.164 |
+| ANN inference | 32 samples, 33 parameters | 0.004 | 0.156 | 0.024 |
+| CNN training | 32 samples, 23 parameters | 1.615 | 0.644 | 2.510 |
+| CNN inference | 32 samples, 23 parameters | 0.064 | 0.161 | 0.397 |
+| Transformer training | 8 sequences, 4 tokens x 4, 134 parameters | 1.324 | 0.770 | 1.719 |
+| Transformer inference | 8 sequences, 4 tokens x 4, 134 parameters | 0.008 | 0.171 | 0.045 |
+| FFT forward/inverse | 8 x 1024 complex | 3.050 | 10.656 | 0.286 |
+| FIR low-pass | 8 x 2048 floats, 65 taps | 2.718 | 0.772 | 3.523 |
+| Biquad low-pass | 8 x 2048 floats, persistent state | 0.097 | 0.233 | 0.417 |
+| FFT band-pass | 8 x 1024 complex, 4-10 kHz | 3.219 | 11.268 | 0.286 |
+| LeNet classifier | 32 x 28 x 28, 61,706 parameters | 46.521 | 7.622 | 6.104 |
+</pre></details>
+<h3>Core i7-1260P / Iris Xe</h3>
+<figure class="report-figure"><a href="plots/benchmark-intel.svg" aria-label="Open standalone SVG: Core i7-1260P / Iris Xe mean pipeline timings and CPU-to-graphics ratios"><img src="plots/benchmark-intel.svg" alt="Core i7-1260P / Iris Xe mean pipeline timings and CPU-to-graphics ratios" loading="lazy"></a><figcaption>Time and ratio axes are logarithmic. A ratio above one favors the graphics path. Means are displayed to three decimal places. Ratios come from the original unrounded means, then are rounded for reporting. <a href="plots/benchmark-intel.svg" download>Download SVG</a></figcaption></figure>
+<details><summary>Exact timing and ratio table · Core i7-1260P / Iris Xe</summary><div class="table-wrap"><table id="benchmark-intel"><caption>Core i7-1260P / Iris Xe · 20 measured repetitions</caption><thead><tr>
+<th scope="col">Pipeline</th>
+<th scope="col">Workload</th>
+<th scope="col">CPU ms</th>
+<th scope="col">Graphics ms</th>
+<th scope="col">CPU / graphics</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Buffer affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.139</td>
+<td>3.928</td>
+<td>0.035</td>
+</tr>
+<tr>
+<th scope="row">Buffer/image blur</th>
+<td>128 x 128</td>
+<td>0.422</td>
+<td>0.054</td>
+<td>7.838</td>
+</tr>
+<tr>
+<th scope="row">Borrowed image blur</th>
+<td>128 x 128</td>
+<td>0.299</td>
+<td>0.052</td>
+<td>5.764</td>
+</tr>
+<tr>
+<th scope="row">Hybrid affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.145</td>
+<td>2.825</td>
+<td>0.051</td>
+</tr>
+<tr>
+<th scope="row">Dynamic library stages</th>
+<td>16384 floats</td>
+<td>0.460</td>
+<td>2.100</td>
+<td>0.219</td>
+</tr>
+<tr>
+<th scope="row">RAW10/debayer/luminance</th>
+<td>128 x 128</td>
+<td>1.080</td>
+<td>0.068</td>
+<td>15.982</td>
+</tr>
+<tr>
+<th scope="row">2D convolution 5 x 5</th>
+<td>128 x 128 vec2</td>
+<td>1.140</td>
+<td>0.059</td>
+<td>19.428</td>
+</tr>
+<tr>
+<th scope="row">3D convolution 3 x 3 x 3</th>
+<td>24 x 24 x 24</td>
+<td>1.266</td>
+<td>0.057</td>
+<td>22.166</td>
+</tr>
+<tr>
+<th scope="row">Forward/inverse direct DFT</th>
+<td>32 x 32 complex</td>
+<td>0.892</td>
+<td>0.080</td>
+<td>11.134</td>
+</tr>
+<tr>
+<th scope="row">Gaussian/Sobel/Harris/NMS</th>
+<td>128 x 128</td>
+<td>1.841</td>
+<td>0.089</td>
+<td>20.761</td>
+</tr>
+<tr>
+<th scope="row">Lossless tiled RLE round trip</th>
+<td>65536 uints</td>
+<td>0.462</td>
+<td>0.248</td>
+<td>1.864</td>
+</tr>
+<tr>
+<th scope="row">EVT3 event decoding</th>
+<td>65536 sixteen-bit words</td>
+<td>2.993</td>
+<td>0.734</td>
+<td>4.079</td>
+</tr>
+<tr>
+<th scope="row">Async ring</th>
+<td>32 x 257 floats, 3 slots</td>
+<td>0.094</td>
+<td>0.730</td>
+<td>0.128</td>
+</tr>
+<tr>
+<th scope="row">EVT3 + optical flow</th>
+<td>32 x 24 sampled plane, history 64</td>
+<td>0.290</td>
+<td>0.215</td>
+<td>1.347</td>
+</tr>
+<tr>
+<th scope="row">ANN training</th>
+<td>32 samples, 33 parameters</td>
+<td>0.072</td>
+<td>0.042</td>
+<td>1.702</td>
+</tr>
+<tr>
+<th scope="row">ANN inference</th>
+<td>32 samples, 33 parameters</td>
+<td>0.002</td>
+<td>0.015</td>
+<td>0.145</td>
+</tr>
+<tr>
+<th scope="row">CNN training</th>
+<td>32 samples, 23 parameters</td>
+<td>1.359</td>
+<td>0.086</td>
+<td>15.741</td>
+</tr>
+<tr>
+<th scope="row">CNN inference</th>
+<td>32 samples, 23 parameters</td>
+<td>0.054</td>
+<td>0.034</td>
+<td>1.570</td>
+</tr>
+<tr>
+<th scope="row">Transformer training</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>0.972</td>
+<td>0.284</td>
+<td>3.427</td>
+</tr>
+<tr>
+<th scope="row">Transformer inference</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>0.006</td>
+<td>0.057</td>
+<td>0.110</td>
+</tr>
+<tr>
+<th scope="row">FFT forward/inverse</th>
+<td>8 x 1024 complex</td>
+<td>2.226</td>
+<td>0.226</td>
+<td>9.856</td>
+</tr>
+<tr>
+<th scope="row">FIR low-pass</th>
+<td>8 x 2048 floats, 65 taps</td>
+<td>1.956</td>
+<td>0.124</td>
+<td>15.724</td>
+</tr>
+<tr>
+<th scope="row">Biquad low-pass</th>
+<td>8 x 2048 floats, persistent state</td>
+<td>0.040</td>
+<td>0.515</td>
+<td>0.077</td>
+</tr>
+<tr>
+<th scope="row">FFT band-pass</th>
+<td>8 x 1024 complex, 4-10 kHz</td>
+<td>2.250</td>
+<td>0.222</td>
+<td>10.150</td>
+</tr>
+<tr>
+<th scope="row">LeNet classifier</th>
+<td>32 x 28 x 28, 61,706 parameters</td>
+<td>40.790</td>
+<td>1.756</td>
+<td>23.229</td>
+</tr>
+</tbody></table></div></details>
+<details class="log-record"><summary>Complete benchmark output · Core i7-1260P / Iris Xe</summary><p>This is the recorded benchmark output. Its EVT3 wording “packed words” counts 16-bit sensor words before two words are packed into each uint.</p><pre>Seed: 12345, iterations: 20, scale: 1.
+GPU renderer: Mesa Intel(R) Iris(R) Xe Graphics (ADL GT2).
+Lossless RLE: 13556 payload words + 257 offset words, 4.74x size reduction.
+EVT3 compact output: 223772 events from 65536 words, five stages include state reset.
+Optical flow input: 610 seeded samples on a known temporal plane, six linked stages.
+Neural training timings measure one mini-batch gradient/SGD update, inference measures the complete forward pipeline.
+Steady-state resident timings, compilation, first uploads and final readback excluded.
+Hybrid timings include transfers between CPU and GPU stages.
+
+| Pipeline | Workload | CPU ms | GPU ms | CPU/GPU |
+| --- | --- | ---: | ---: | ---: |
+| Buffer affine/clamp/sum | 16384 floats | 0.139 | 3.928 | 0.035 |
+| Buffer/image blur | 128 x 128 | 0.422 | 0.054 | 7.838 |
+| Borrowed image blur | 128 x 128 | 0.299 | 0.052 | 5.764 |
+| Hybrid affine/clamp/sum | 16384 floats | 0.145 | 2.825 | 0.051 |
+| Dynamic library stages | 16384 floats | 0.460 | 2.100 | 0.219 |
+| RAW10/debayer/luminance | 128 x 128 | 1.080 | 0.068 | 15.982 |
+| 2D convolution 5 x 5 | 128 x 128 vec2 | 1.140 | 0.059 | 19.428 |
+| 3D convolution 3 x 3 x 3 | 24 x 24 x 24 | 1.266 | 0.057 | 22.166 |
+| Forward/inverse direct DFT | 32 x 32 complex | 0.892 | 0.080 | 11.134 |
+| Gaussian/Sobel/Harris/NMS | 128 x 128 | 1.841 | 0.089 | 20.761 |
+| Lossless tiled RLE round trip | 65536 uints | 0.462 | 0.248 | 1.864 |
+| EVT3 event decoding | 65536 packed words | 2.993 | 0.734 | 4.079 |
+| Async ring | 32 x 257 floats, 3 slots | 0.094 | 0.730 | 0.128 |
+| EVT3 + optical flow | 32 x 24 sampled plane, history 64 | 0.290 | 0.215 | 1.347 |
+| ANN training | 32 samples, 33 parameters | 0.072 | 0.042 | 1.702 |
+| ANN inference | 32 samples, 33 parameters | 0.002 | 0.015 | 0.145 |
+| CNN training | 32 samples, 23 parameters | 1.359 | 0.086 | 15.741 |
+| CNN inference | 32 samples, 23 parameters | 0.054 | 0.034 | 1.570 |
+| Transformer training | 8 sequences, 4 tokens x 4, 134 parameters | 0.972 | 0.284 | 3.427 |
+| Transformer inference | 8 sequences, 4 tokens x 4, 134 parameters | 0.006 | 0.057 | 0.110 |
+| FFT forward/inverse | 8 x 1024 complex | 2.226 | 0.226 | 9.856 |
+| FIR low-pass | 8 x 2048 floats, 65 taps | 1.956 | 0.124 | 15.724 |
+| Biquad low-pass | 8 x 2048 floats, persistent state | 0.040 | 0.515 | 0.077 |
+| FFT band-pass | 8 x 1024 complex, 4-10 kHz | 2.250 | 0.222 | 10.150 |
+| LeNet classifier | 32 x 28 x 28, 61,706 parameters | 40.790 | 1.756 | 23.229 |
+</pre></details>
+<h3>Raspberry Pi 5 / V3D</h3>
+<figure class="report-figure"><a href="plots/benchmark-pi.svg" aria-label="Open standalone SVG: Raspberry Pi 5 / V3D mean pipeline timings and CPU-to-graphics ratios"><img src="plots/benchmark-pi.svg" alt="Raspberry Pi 5 / V3D mean pipeline timings and CPU-to-graphics ratios" loading="lazy"></a><figcaption>Time and ratio axes are logarithmic. A ratio above one favors the graphics path. Means are displayed to three decimal places. Ratios come from the original unrounded means, then are rounded for reporting. <a href="plots/benchmark-pi.svg" download>Download SVG</a></figcaption></figure>
+<details><summary>Exact timing and ratio table · Raspberry Pi 5 / V3D</summary><div class="table-wrap"><table id="benchmark-pi"><caption>Raspberry Pi 5 / V3D · 20 measured repetitions</caption><thead><tr>
+<th scope="col">Pipeline</th>
+<th scope="col">Workload</th>
+<th scope="col">CPU ms</th>
+<th scope="col">Graphics ms</th>
+<th scope="col">CPU / graphics</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Buffer affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.516</td>
+<td>1.956</td>
+<td>0.264</td>
+</tr>
+<tr>
+<th scope="row">Buffer/image blur</th>
+<td>128 x 128</td>
+<td>1.033</td>
+<td>0.471</td>
+<td>2.192</td>
+</tr>
+<tr>
+<th scope="row">Borrowed image blur</th>
+<td>128 x 128</td>
+<td>0.951</td>
+<td>0.469</td>
+<td>2.029</td>
+</tr>
+<tr>
+<th scope="row">Hybrid affine/clamp/sum</th>
+<td>16384 floats</td>
+<td>0.597</td>
+<td>2.188</td>
+<td>0.273</td>
+</tr>
+<tr>
+<th scope="row">Dynamic library stages</th>
+<td>16384 floats</td>
+<td>0.838</td>
+<td>1.968</td>
+<td>0.426</td>
+</tr>
+<tr>
+<th scope="row">RAW10/debayer/luminance</th>
+<td>128 x 128</td>
+<td>2.466</td>
+<td>2.522</td>
+<td>0.978</td>
+</tr>
+<tr>
+<th scope="row">2D convolution 5 x 5</th>
+<td>128 x 128 vec2</td>
+<td>3.283</td>
+<td>2.444</td>
+<td>1.343</td>
+</tr>
+<tr>
+<th scope="row">3D convolution 3 x 3 x 3</th>
+<td>24 x 24 x 24</td>
+<td>3.156</td>
+<td>3.020</td>
+<td>1.045</td>
+</tr>
+<tr>
+<th scope="row">Forward/inverse direct DFT</th>
+<td>32 x 32 complex</td>
+<td>2.589</td>
+<td>0.579</td>
+<td>4.472</td>
+</tr>
+<tr>
+<th scope="row">Gaussian/Sobel/Harris/NMS</th>
+<td>128 x 128</td>
+<td>4.571</td>
+<td>2.345</td>
+<td>1.949</td>
+</tr>
+<tr>
+<th scope="row">Lossless tiled RLE round trip</th>
+<td>65536 uints</td>
+<td>1.256</td>
+<td>1.253</td>
+<td>1.002</td>
+</tr>
+<tr>
+<th scope="row">EVT3 event decoding</th>
+<td>65536 sixteen-bit words</td>
+<td>4.873</td>
+<td>6.988</td>
+<td>0.697</td>
+</tr>
+<tr>
+<th scope="row">Async ring</th>
+<td>32 x 257 floats, 3 slots</td>
+<td>0.143</td>
+<td>1.976</td>
+<td>0.072</td>
+</tr>
+<tr>
+<th scope="row">EVT3 + optical flow</th>
+<td>32 x 24 sampled plane, history 64</td>
+<td>0.640</td>
+<td>0.656</td>
+<td>0.976</td>
+</tr>
+<tr>
+<th scope="row">ANN training</th>
+<td>32 samples, 33 parameters</td>
+<td>0.206</td>
+<td>0.114</td>
+<td>1.804</td>
+</tr>
+<tr>
+<th scope="row">ANN inference</th>
+<td>32 samples, 33 parameters</td>
+<td>0.006</td>
+<td>0.037</td>
+<td>0.173</td>
+</tr>
+<tr>
+<th scope="row">CNN training</th>
+<td>32 samples, 23 parameters</td>
+<td>3.254</td>
+<td>0.490</td>
+<td>6.636</td>
+</tr>
+<tr>
+<th scope="row">CNN inference</th>
+<td>32 samples, 23 parameters</td>
+<td>0.138</td>
+<td>0.057</td>
+<td>2.393</td>
+</tr>
+<tr>
+<th scope="row">Transformer training</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>2.404</td>
+<td>0.729</td>
+<td>3.296</td>
+</tr>
+<tr>
+<th scope="row">Transformer inference</th>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td>0.018</td>
+<td>0.055</td>
+<td>0.330</td>
+</tr>
+<tr>
+<th scope="row">FFT forward/inverse</th>
+<td>8 x 1024 complex</td>
+<td>5.936</td>
+<td>4.174</td>
+<td>1.422</td>
+</tr>
+<tr>
+<th scope="row">FIR low-pass</th>
+<td>8 x 2048 floats, 65 taps</td>
+<td>6.570</td>
+<td>5.499</td>
+<td>1.195</td>
+</tr>
+<tr>
+<th scope="row">Biquad low-pass</th>
+<td>8 x 2048 floats, persistent state</td>
+<td>0.156</td>
+<td>0.691</td>
+<td>0.226</td>
+</tr>
+<tr>
+<th scope="row">FFT band-pass</th>
+<td>8 x 1024 complex, 4-10 kHz</td>
+<td>6.153</td>
+<td>5.001</td>
+<td>1.230</td>
+</tr>
+<tr>
+<th scope="row">LeNet classifier</th>
+<td>32 x 28 x 28, 61,706 parameters</td>
+<td>116.491</td>
+<td>136.617</td>
+<td>0.853</td>
+</tr>
+</tbody></table></div></details>
+<details class="log-record"><summary>Complete benchmark output · Raspberry Pi 5 / V3D</summary><p>This is the recorded benchmark output. Its EVT3 wording “packed words” counts 16-bit sensor words before two words are packed into each uint.</p><pre>Seed: 12345, iterations: 20, scale: 1.
+GPU renderer: V3D 7.1.7.0.
+Lossless RLE: 13556 payload words + 257 offset words, 4.74x size reduction.
+EVT3 compact output: 223772 events from 65536 words, five stages include state reset.
+Optical flow input: 610 seeded samples on a known temporal plane, six linked stages.
+Neural training timings measure one mini-batch gradient/SGD update, inference measures the complete forward pipeline.
+Steady-state resident timings, compilation, first uploads and final readback excluded.
+Hybrid timings include transfers between CPU and GPU stages.
+
+| Pipeline | Workload | CPU ms | GPU ms | CPU/GPU |
+| --- | --- | ---: | ---: | ---: |
+| Buffer affine/clamp/sum | 16384 floats | 0.516 | 1.956 | 0.264 |
+| Buffer/image blur | 128 x 128 | 1.033 | 0.471 | 2.192 |
+| Borrowed image blur | 128 x 128 | 0.951 | 0.469 | 2.029 |
+| Hybrid affine/clamp/sum | 16384 floats | 0.597 | 2.188 | 0.273 |
+| Dynamic library stages | 16384 floats | 0.838 | 1.968 | 0.426 |
+| RAW10/debayer/luminance | 128 x 128 | 2.466 | 2.522 | 0.978 |
+| 2D convolution 5 x 5 | 128 x 128 vec2 | 3.283 | 2.444 | 1.343 |
+| 3D convolution 3 x 3 x 3 | 24 x 24 x 24 | 3.156 | 3.020 | 1.045 |
+| Forward/inverse direct DFT | 32 x 32 complex | 2.589 | 0.579 | 4.472 |
+| Gaussian/Sobel/Harris/NMS | 128 x 128 | 4.571 | 2.345 | 1.949 |
+| Lossless tiled RLE round trip | 65536 uints | 1.256 | 1.253 | 1.002 |
+| EVT3 event decoding | 65536 packed words | 4.873 | 6.988 | 0.697 |
+| Async ring | 32 x 257 floats, 3 slots | 0.143 | 1.976 | 0.072 |
+| EVT3 + optical flow | 32 x 24 sampled plane, history 64 | 0.640 | 0.656 | 0.976 |
+| ANN training | 32 samples, 33 parameters | 0.206 | 0.114 | 1.804 |
+| ANN inference | 32 samples, 33 parameters | 0.006 | 0.037 | 0.173 |
+| CNN training | 32 samples, 23 parameters | 3.254 | 0.490 | 6.636 |
+| CNN inference | 32 samples, 23 parameters | 0.138 | 0.057 | 2.393 |
+| Transformer training | 8 sequences, 4 tokens x 4, 134 parameters | 2.404 | 0.729 | 3.296 |
+| Transformer inference | 8 sequences, 4 tokens x 4, 134 parameters | 0.018 | 0.055 | 0.330 |
+| FFT forward/inverse | 8 x 1024 complex | 5.936 | 4.174 | 1.422 |
+| FIR low-pass | 8 x 2048 floats, 65 taps | 6.570 | 5.499 | 1.195 |
+| Biquad low-pass | 8 x 2048 floats, persistent state | 0.156 | 0.691 | 0.226 |
+| FFT band-pass | 8 x 1024 complex, 4-10 kHz | 6.153 | 5.001 | 1.230 |
+| LeNet classifier | 32 x 28 x 28, 61,706 parameters | 116.491 | 136.617 | 0.853 |
+</pre></details>
+<p>The EVT3 decoder emits 223772 ordered events from 65536 sensor words. Five stages include resetting decoder state. Normal flow uses 610 seeded samples from a 32×24 temporal plane and history 64. The RLE payload has 13556 words plus 257 offset words, a 4.74-fold reduction for this input. The encoder still reserves worst-case capacity. Prefix and reduction stages can dominate small graphics workloads.</p><p>The timing plots show the archived mean values at their recorded precision. Differences across machines include CPU, operating system, driver and renderer effects.</p><pre><code><span class="tok-c1"># Reproduce the resident measurement settings.</span>
+<span class="tok-nv">SHDR_BENCH_ITERATIONS</span><span class="tok-o">=</span><span class="tok-m">20</span><span class="tok-w"> </span><span class="tok-nv">SHDR_BENCH_SCALE</span><span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-w"> </span>./build/example_benchmark<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31</code></pre></section>
+<section id="real-data"><h2 id="mnist">Complete held-out digit evaluation</h2><p>The modern LeNet-style classifier produced <strong>9778 correct predictions from all 10,000 official MNIST test images</strong>, or <strong>97.78%</strong>, on every recorded CPU and graphics path. Every one of the 100,000 output logits was compared with the shipped independent framework reference.</p><p>The seven-stage model has 61,706 parameters, full second-convolution connectivity, ReLU, fixed average pooling and a linear ten-class head. It is a documented modern LeNet-5 adaptation. Native deployment uses plain float weights and the shdr C++/OpenGL runtime. <a href="neural.html">The neural guide</a> describes the architecture and parameter layout.</p>
+<div class="table-wrap"><table id="mnist-metrics"><caption>All six complete native evaluations · identical official test order</caption><thead><tr>
+<th scope="col">Configuration</th>
+<th scope="col">Execution path</th>
+<th scope="col">Correct</th>
+<th scope="col">Images</th>
+<th scope="col">Accuracy %</th>
+<th scope="col">Completed seconds</th>
+<th scope="col">Maximum normalized logit error</th>
+</tr></thead><tbody>
+<tr data-host="amd" data-backend="cpu">
+<th scope="row">Ryzen 5900X / llvmpipe</th>
+<td>CPU</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>17.2063</td>
+<td>4.57699e-06</td>
+</tr>
+<tr data-host="amd" data-backend="gpu">
+<th scope="row">Ryzen 5900X / llvmpipe</th>
+<td>llvmpipe software</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>1.76238</td>
+<td>4.57699e-06</td>
+</tr>
+<tr data-host="intel" data-backend="cpu">
+<th scope="row">Core i7-1260P / Iris Xe</th>
+<td>CPU</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>13.8871</td>
+<td>4.57699e-06</td>
+</tr>
+<tr data-host="intel" data-backend="gpu">
+<th scope="row">Core i7-1260P / Iris Xe</th>
+<td>Iris Xe hardware</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>1.95504</td>
+<td>4.00418e-06</td>
+</tr>
+<tr data-host="pi" data-backend="cpu">
+<th scope="row">Raspberry Pi 5 / V3D</th>
+<td>CPU</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>35.0628</td>
+<td>4.00418e-06</td>
+</tr>
+<tr data-host="pi" data-backend="gpu">
+<th scope="row">Raspberry Pi 5 / V3D</th>
+<td>V3D hardware</td>
+<td>9778</td>
+<td>10000</td>
+<td>97.78</td>
+<td>41.5901</td>
+<td>4.57699e-06</td>
+</tr>
+</tbody></table></div>
+<figure class="report-figure"><a href="plots/mnist-evaluation.svg" aria-label="Open standalone SVG: Accuracy and completed time for all six full MNIST evaluations"><img src="plots/mnist-evaluation.svg" alt="Accuracy and completed time for all six full MNIST evaluations" loading="lazy"></a><figcaption>Every path has 97.78% accuracy. These evaluation times include bounded batch construction, input normalization, program setup, native inference, result reads and reference comparisons. Timing begins after the initial dataset reads. The resident benchmarks above measure their own dispatch intervals. <a href="plots/mnist-evaluation.svg" download>Download SVG</a></figcaption></figure>
+<p>Normalized logit error is <code>abs(actual-reference)/(1+abs(reference))</code>, maximized over all 100,000 scores. The model was prepared on the separate 60,000-image training split for three complete epochs with Adam, learning rate 0.001, batch size 128 and seed 12345. Independent framework evaluation also recorded 97.78%. The <a href="datasets.html">data guide</a> records public input provenance and preprocessing.</p><pre><code><span class="tok-c1"># Prepare all official test images explicitly before a complete evaluation.</span>
+python3<span class="tok-w"> </span>scripts/prepare_datasets.py<span class="tok-w"> </span>--full-mnist
+<span class="tok-c1"># Evaluate every held-out digit on the selected native backend.</span>
+<span class="tok-nv">SHDR_FULL_MNIST_DIR</span><span class="tok-o">=</span>build/datasets<span class="tok-w"> </span>./build/example_real_data<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31</code></pre><h3>Reference confusion counts</h3><p>This matrix counts the independent framework predictions from the shipped reference logits and all original test labels. The native evaluations above record total accuracy and the maximum normalized error across all 100,000 logits.</p>
+<figure class="report-figure"><a href="plots/mnist-reference-confusion.svg" aria-label="Open standalone SVG: Actual independent reference confusion counts for all official test digits"><img src="plots/mnist-reference-confusion.svg" alt="Actual independent reference confusion counts for all official test digits" loading="lazy"></a><figcaption>Rows are official labels and columns are independent framework predictions. Cell annotations are exact counts. Positive color values use a logarithmic scale, and zero-count cells remain white. <a href="plots/mnist-reference-confusion.svg" download>Download SVG</a></figcaption></figure>
+<details><summary>Exact reference confusion table · 10000 official test images</summary><div class="table-wrap"><table id="reference-confusion"><caption>Independent framework reference counts · true class by predicted class</caption><thead><tr>
+<th scope="col">True digit / predicted</th>
+<th scope="col">0</th>
+<th scope="col">1</th>
+<th scope="col">2</th>
+<th scope="col">3</th>
+<th scope="col">4</th>
+<th scope="col">5</th>
+<th scope="col">6</th>
+<th scope="col">7</th>
+<th scope="col">8</th>
+<th scope="col">9</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">0</th>
+<td>969</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>3</td>
+<td>1</td>
+<td>4</td>
+<td>1</td>
+</tr>
+<tr>
+<th scope="row">1</th>
+<td>0</td>
+<td>1121</td>
+<td>2</td>
+<td>1</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>9</td>
+<td>0</td>
+</tr>
+<tr>
+<th scope="row">2</th>
+<td>6</td>
+<td>1</td>
+<td>1009</td>
+<td>4</td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td>4</td>
+<td>7</td>
+<td>0</td>
+</tr>
+<tr>
+<th scope="row">3</th>
+<td>1</td>
+<td>0</td>
+<td>3</td>
+<td>982</td>
+<td>0</td>
+<td>14</td>
+<td>0</td>
+<td>4</td>
+<td>6</td>
+<td>0</td>
+</tr>
+<tr>
+<th scope="row">4</th>
+<td>1</td>
+<td>2</td>
+<td>4</td>
+<td>0</td>
+<td>936</td>
+<td>0</td>
+<td>3</td>
+<td>3</td>
+<td>2</td>
+<td>31</td>
+</tr>
+<tr>
+<th scope="row">5</th>
+<td>1</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td>884</td>
+<td>2</td>
+<td>1</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<th scope="row">6</th>
+<td>5</td>
+<td>3</td>
+<td>0</td>
+<td>1</td>
+<td>4</td>
+<td>6</td>
+<td>936</td>
+<td>0</td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<th scope="row">7</th>
+<td>1</td>
+<td>1</td>
+<td>5</td>
+<td>3</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>1009</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<th scope="row">8</th>
+<td>3</td>
+<td>0</td>
+<td>2</td>
+<td>4</td>
+<td>1</td>
+<td>5</td>
+<td>0</td>
+<td>1</td>
+<td>956</td>
+<td>2</td>
+</tr>
+<tr>
+<th scope="row">9</th>
+<td>4</td>
+<td>5</td>
+<td>0</td>
+<td>6</td>
+<td>2</td>
+<td>6</td>
+<td>0</td>
+<td>2</td>
+<td>8</td>
+<td>976</td>
+</tr>
+</tbody></table></div></details>
+<h3>Small-model training on real zero/one images</h3><p>The ANN, CNN and transformer examples fit one balanced 32-image mini-batch from the official training split. They use the original binary digit labels with documented feature transformations. The numbers below are training loss before and after the recorded updates. These measurements describe optimization on the training images. The LeNet evaluation above reports held-out classification quality. All six complete evaluation logs print the same values at the recorded precision.</p>
+<div class="table-wrap"><table id="mini-batch-loss"><caption>Recorded observations on one 32-image training mini-batch</caption><thead><tr>
+<th scope="col">Model</th>
+<th scope="col">SGD updates</th>
+<th scope="col">Initial mean binary cross entropy</th>
+<th scope="col">Final mean binary cross entropy</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">ANN</th>
+<td>32</td>
+<td>0.694159</td>
+<td>0.20248</td>
+</tr>
+<tr>
+<th scope="row">CNN</th>
+<td>32</td>
+<td>0.699285</td>
+<td>0.446509</td>
+</tr>
+<tr>
+<th scope="row">Transformer</th>
+<td>12</td>
+<td>0.61123</td>
+<td>0.360663</td>
+</tr>
+</tbody></table></div>
+<figure class="report-figure"><a href="plots/mini-batch-loss.svg" aria-label="Open standalone SVG: Recorded initial and final mini-batch losses for ANN, CNN and transformer"><img src="plots/mini-batch-loss.svg" alt="Recorded initial and final mini-batch losses for ANN, CNN and transformer" loading="lazy"></a><figcaption>This figure compares the two recorded observations: initial and final mini-batch loss. ANN and CNN have 32 updates, and the transformer has 12. <a href="plots/mini-batch-loss.svg" download>Download SVG</a></figcaption></figure>
+<h3>Complete real-data functional outputs</h3><p>Each run includes linked and mixed resources, asynchronous submission, dynamic libraries, image storage, all Bayer packing/phase combinations, corners, direct DFT and reconstruction, 3D convolution, FFT and windows, five FIR modes, four biquad modes, exact EVT3 decoding and normal flow, small-model training, and the full deeper classifier. Satellite corners, event flow and ECG processing use numerical reference checks and backend comparisons in these fixtures.</p>
+<details class="log-record"><summary>Complete public-data evaluation log · Ryzen 5900X / llvmpipe / CPU</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 0
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 0
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 0
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 0
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 0
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 0
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 0
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 0
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 0
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 0
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 0
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 0
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.57699e-06, completed seconds 17.2063
+All public real-data functional cases passed
+</pre></details>
+<details class="log-record"><summary>Complete public-data evaluation log · Ryzen 5900X / llvmpipe / ES 3.1 graphics</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 0
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 0
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 0
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 0
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 0
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 9.86406e-07
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 6.86873e-08
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 4.38723e-08
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 4.4295e-08
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 4.36838e-08
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 6.86873e-08
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 4.38723e-08
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 4.4295e-08
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 4.36838e-08
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 3.99307e-08
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 4.23175e-08
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 6.92246e-08
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 4.29885e-08
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 4.28234e-08
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 4.13282e-08
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 7.13851e-08
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 4.44882e-08
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 2.3254e-08
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 3.29144e-08
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 3.84523e-08
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 4.5632e-08
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 3.69377e-06
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 3.20483e-06
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 4.3956e-06
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 1.18087e-07
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 1.16945e-07
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 4.75941e-08
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 0
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 1.59604e-07
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 1.43349e-07
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 9.37875e-08
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.57699e-06, completed seconds 1.76238
+All public real-data functional cases passed
+</pre></details>
+<details class="log-record"><summary>Complete public-data evaluation log · Core i7-1260P / Iris Xe / CPU</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 0
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 0
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 0
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 0
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 0
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 0
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 0
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 0
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 0
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 0
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 0
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 0
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.57699e-06, completed seconds 13.8871
+All public real-data functional cases passed
+</pre></details>
+<details class="log-record"><summary>Complete public-data evaluation log · Core i7-1260P / Iris Xe / ES 3.1 graphics</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 5.94309e-08
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 3.97048e-08
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 5.94309e-08
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 3.96951e-08
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 7.93092e-08
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 1.80282e-06
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 1.16552e-07
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 1.03031e-07
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 7.81543e-08
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 1.018e-07
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 7.94091e-08
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 7.03978e-08
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 7.08066e-08
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 4.4786e-08
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 6.23303e-08
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 7.20829e-08
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 7.39612e-08
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 6.92246e-08
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 7.3392e-08
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 7.86475e-08
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 7.70446e-08
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 7.74885e-08
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 1.01541e-07
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 3.6866e-06
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 7.13594e-08
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 1.47238e-07
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 1.1783e-07
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 9.9671e-08
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 3.6866e-06
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 4.82402e-05
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 4.10839e-05
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 6.12265e-05
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 6.89868e-08
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 6.79252e-08
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 6.75995e-08
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 7.03995e-08
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 9.13858e-08
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 1.02826e-07
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 1.51945e-07
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 4.99365e-08
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 8.46699e-08
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 2.94724e-07
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 2.2301e-07
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 1.21958e-07
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 1.28923e-07
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.00418e-06, completed seconds 1.95504
+All public real-data functional cases passed
+</pre></details>
+<details class="log-record"><summary>Complete public-data evaluation log · Raspberry Pi 5 / V3D / CPU</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 0
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 0
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 0
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 0
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 0
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 0
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 0
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 0
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 0
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 0
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 0
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 0
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 0
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 0
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 0
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.00418e-06, completed seconds 35.0628
+All public real-data functional cases passed
+</pre></details>
+<details class="log-record"><summary>Complete public-data evaluation log · Raspberry Pi 5 / V3D / ES 3.1 graphics</summary><pre>NASA linked affine/clamp/reduction: verified, normalized CPU/GPU error 0
+NASA mixed CPU/GPU resources: verified, normalized CPU/GPU error 0
+NASA asynchronous resource submission: verified
+NASA dynamically loaded shader pipeline: verified, normalized CPU/GPU error 0
+NASA buffer/image/box-filter pipeline: verified, normalized CPU/GPU error 3.96539e-08
+NASA Gaussian/Sobel/Harris/nonmaximum suppression: verified, normalized CPU/GPU error 7.36937e-08
+NASA selected Harris peaks: 61
+NASA 2D convolution/DFT/inverse: verified, normalized CPU/GPU error 3.6358e-05
+MNIST image-stack 3D convolution: verified, normalized CPU/GPU error 1.16552e-07
+NASA derived Bayer packing 0 phase 0: verified, normalized CPU/GPU error 7.92272e-08
+NASA derived Bayer packing 0 phase 1: verified, normalized CPU/GPU error 1.06714e-07
+NASA derived Bayer packing 0 phase 2: verified, normalized CPU/GPU error 1.00736e-07
+NASA derived Bayer packing 0 phase 3: verified, normalized CPU/GPU error 1.08238e-07
+NASA derived Bayer packing 1 phase 0: verified, normalized CPU/GPU error 6.72781e-08
+NASA derived Bayer packing 1 phase 1: verified, normalized CPU/GPU error 4.70995e-08
+NASA derived Bayer packing 1 phase 2: verified, normalized CPU/GPU error 7.92794e-08
+NASA derived Bayer packing 1 phase 3: verified, normalized CPU/GPU error 7.11205e-08
+NASA derived Bayer packing 2 phase 0: verified, normalized CPU/GPU error 7.52445e-08
+NASA derived Bayer packing 2 phase 1: verified, normalized CPU/GPU error 6.91206e-08
+NASA derived Bayer packing 2 phase 2: verified, normalized CPU/GPU error 7.10627e-08
+NASA derived Bayer packing 2 phase 3: verified, normalized CPU/GPU error 4.36114e-08
+NASA derived Bayer packing 3 phase 0: verified, normalized CPU/GPU error 7.962e-08
+NASA derived Bayer packing 3 phase 1: verified, normalized CPU/GPU error 1.06704e-07
+NASA derived Bayer packing 3 phase 2: verified, normalized CPU/GPU error 7.94e-08
+NASA derived Bayer packing 3 phase 3: verified, normalized CPU/GPU error 7.94582e-08
+NASA tiled lossless RLE image roundtrip: verified, normalized CPU/GPU error 0
+NASA RLE encoded words: 15996 from 12288 input words
+PhysioNet ECG 1D FFT/inverse: verified, normalized CPU/GPU error 3.68661e-06
+PhysioNet ECG FFT filter 0: verified, normalized CPU/GPU error 7.08652e-08
+PhysioNet ECG FFT filter 1: verified, normalized CPU/GPU error 1.17658e-07
+PhysioNet ECG FFT filter 2: verified, normalized CPU/GPU error 1.18611e-07
+PhysioNet ECG FFT filter 3: verified, normalized CPU/GPU error 8.98478e-08
+PhysioNet ECG spectral window 0: verified, normalized CPU/GPU error 3.68661e-06
+PhysioNet ECG spectral window 1: verified, normalized CPU/GPU error 7.06065e-06
+PhysioNet ECG spectral window 2: verified, normalized CPU/GPU error 6.78297e-06
+PhysioNet ECG spectral window 3: verified, normalized CPU/GPU error 1.05561e-05
+PhysioNet ECG FIR filter 0: verified, normalized CPU/GPU error 6.89868e-08
+PhysioNet ECG FIR filter 1: verified, normalized CPU/GPU error 6.79252e-08
+PhysioNet ECG FIR filter 2: verified, normalized CPU/GPU error 6.75995e-08
+PhysioNet ECG FIR filter 3: verified, normalized CPU/GPU error 7.03995e-08
+PhysioNet ECG FIR filter 4: verified, normalized CPU/GPU error 9.13858e-08
+PhysioNet ECG biquad filter 0: verified, normalized CPU/GPU error 1.18087e-07
+PhysioNet ECG biquad filter 1: verified, normalized CPU/GPU error 1.38721e-07
+PhysioNet ECG biquad filter 2: verified, normalized CPU/GPU error 4.99365e-08
+PhysioNet ECG biquad filter 3: verified, normalized CPU/GPU error 8.81661e-08
+Prophesee real EVT3 decode/normal-flow pipeline: verified, normalized CPU/GPU error 2.89683e-07
+Prophesee recording: 21950 decoded events, 21950 compact CD words, 500 accepted normal-flow fits
+MNIST two-feature ANN training/inference: verified, normalized CPU/GPU error 2.36301e-07
+MNIST two-feature ANN mini-batch loss: 0.694159 -&gt; 0.20248
+MNIST compact CNN training/inference: verified, normalized CPU/GPU error 1.14864e-07
+MNIST compact CNN mini-batch loss: 0.699285 -&gt; 0.446509
+MNIST patch-token transformer training/inference: verified, normalized CPU/GPU error 9.5935e-08
+MNIST patch-token transformer mini-batch loss: 0.61123 -&gt; 0.360663
+LeNet-style classifier: all seven layers and 61706 parameters verified against a double oracle
+LeNet MNIST held-out: 9778/10000 correct, accuracy 97.78%, normalized reference error 4.57699e-06, completed seconds 41.5901
+All public real-data functional cases passed
+</pre></details>
+</section><section id="tests"><h2>Every registered test outcome</h2><p>The table below matches cases by test name. A skipped context records a requested graphics profile outside the tested driver configuration. Iris Xe has 108 registered cases. Ryzen and Raspberry Pi also include the optional glslang check, for 109 cases.</p>
+<div class="table-wrap"><table id="runtime-tests"><caption>Final frozen runtime and integration test totals</caption><thead><tr>
+<th scope="col">Configuration</th>
+<th scope="col">Passed</th>
+<th scope="col">Skipped</th>
+<th scope="col">Failed</th>
+<th scope="col">Registered cases</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Ryzen 5900X / llvmpipe</th>
+<td>92</td>
+<td>17</td>
+<td>0</td>
+<td>109</td>
+</tr>
+<tr>
+<th scope="row">Core i7-1260P / Iris Xe</th>
+<td>108</td>
+<td>0</td>
+<td>0</td>
+<td>108</td>
+</tr>
+<tr>
+<th scope="row">Raspberry Pi 5 / V3D</th>
+<td>41</td>
+<td>68</td>
+<td>0</td>
+<td>109</td>
+</tr>
+</tbody></table></div>
+<figure class="report-figure"><a href="plots/test-coverage.svg" aria-label="Open standalone SVG: Passed, skipped and failed registered test cases on all three platforms"><img src="plots/test-coverage.svg" alt="Passed, skipped and failed registered test cases on all three platforms" loading="lazy"></a><figcaption>The counts refer to registered CTest cases. Some cases contain many individual assertions or compiler checks. The 250 shader/profile combinations are counted separately below. <a href="plots/test-coverage.svg" download>Download SVG</a></figcaption></figure>
+<div class="callout"><strong>Profile coverage differs by driver.</strong> Iris Xe executed ES 3.1, ES 3.2, GL 4.3, GL 4.5 and GL 4.6 requests. llvmpipe executed the first four and skipped GL 4.6. The tested V3D driver executed ES 3.1 and skipped ES 3.2 and desktop GL requests.</div><p>Math checks cover vector and matrix operations, integer and packing functions, and alias-safe swizzles. Runtime checks cover resource authority, linked dispatches, composition, snapshots and error handling. GPU checks cover numerical parity and context/resource lifetimes. Async checks cover bounded CPU queues, independent snapshots, nonblocking fence polling, and explicit waits. Shader examples include independent references and recorded edge cases.</p><h3>Named CTest records</h3>
+<details><summary>All 109 named case records with status and duration</summary><div class="table-wrap"><table id="test-records"><caption>Exact registered test names and reported durations</caption><thead><tr>
+<th scope="col">Test name</th>
+<th scope="col">Ryzen result</th>
+<th scope="col">Ryzen seconds</th>
+<th scope="col">Iris Xe result</th>
+<th scope="col">Iris Xe seconds</th>
+<th scope="col">Pi 5 result</th>
+<th scope="col">Pi 5 seconds</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">example_pipeline_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_pipeline_es31</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_pipeline_es32</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_pipeline_gl43</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_pipeline_gl45</th>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_pipeline_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.02</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_images_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_images_es31</th>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_images_es32</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_images_gl43</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_images_gl45</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.06</td>
+</tr>
+<tr>
+<th scope="row">example_images_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_es31</th>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_es32</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_gl43</th>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_gl45</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_hybrid_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_async_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_async_es31</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_async_es32</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_async_gl43</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_async_gl45</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_async_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_es31</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_es32</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_gl43</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_gl45</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_spectral_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_vision_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_vision_es31</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_vision_es32</th>
+<td>Passed</td>
+<td>0.09</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_vision_gl43</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_vision_gl45</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_vision_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_es31</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_es32</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_gl43</th>
+<td>Passed</td>
+<td>0.08</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_gl45</th>
+<td>Passed</td>
+<td>0.09</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_imaging_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_cpu</th>
+<td>Passed</td>
+<td>0.01</td>
+<td>Passed</td>
+<td>0.01</td>
+<td>Passed</td>
+<td>0.02</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_es31</th>
+<td>Passed</td>
+<td>1.97</td>
+<td>Passed</td>
+<td>0.83</td>
+<td>Passed</td>
+<td>0.61</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_es32</th>
+<td>Passed</td>
+<td>2.04</td>
+<td>Passed</td>
+<td>0.82</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_gl43</th>
+<td>Passed</td>
+<td>2.05</td>
+<td>Passed</td>
+<td>0.80</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_gl45</th>
+<td>Passed</td>
+<td>2.01</td>
+<td>Passed</td>
+<td>0.82</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_evt3_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.80</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_neural_cpu</th>
+<td>Passed</td>
+<td>0.02</td>
+<td>Passed</td>
+<td>0.02</td>
+<td>Passed</td>
+<td>0.03</td>
+</tr>
+<tr>
+<th scope="row">example_neural_es31</th>
+<td>Passed</td>
+<td>0.17</td>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.12</td>
+</tr>
+<tr>
+<th scope="row">example_neural_es32</th>
+<td>Passed</td>
+<td>0.17</td>
+<td>Passed</td>
+<td>0.05</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_neural_gl43</th>
+<td>Passed</td>
+<td>0.16</td>
+<td>Passed</td>
+<td>0.05</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_neural_gl45</th>
+<td>Passed</td>
+<td>0.17</td>
+<td>Passed</td>
+<td>0.05</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_neural_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.05</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_cpu</th>
+<td>Passed</td>
+<td>0.32</td>
+<td>Passed</td>
+<td>0.20</td>
+<td>Passed</td>
+<td>0.59</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_es31</th>
+<td>Passed</td>
+<td>0.45</td>
+<td>Passed</td>
+<td>0.30</td>
+<td>Passed</td>
+<td>0.80</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_es32</th>
+<td>Passed</td>
+<td>0.60</td>
+<td>Passed</td>
+<td>0.29</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_gl43</th>
+<td>Passed</td>
+<td>0.54</td>
+<td>Passed</td>
+<td>0.27</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_gl45</th>
+<td>Passed</td>
+<td>0.58</td>
+<td>Passed</td>
+<td>0.27</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_cnn_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.29</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_cpu</th>
+<td>Passed</td>
+<td>0.06</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.09</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_es31</th>
+<td>Passed</td>
+<td>0.18</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Passed</td>
+<td>0.21</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_es32</th>
+<td>Passed</td>
+<td>0.23</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_gl43</th>
+<td>Passed</td>
+<td>0.21</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_gl45</th>
+<td>Passed</td>
+<td>0.16</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_transformer_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_signal_cpu</th>
+<td>Passed</td>
+<td>0.02</td>
+<td>Passed</td>
+<td>0.01</td>
+<td>Passed</td>
+<td>0.03</td>
+</tr>
+<tr>
+<th scope="row">example_signal_es31</th>
+<td>Passed</td>
+<td>0.40</td>
+<td>Passed</td>
+<td>0.13</td>
+<td>Passed</td>
+<td>0.20</td>
+</tr>
+<tr>
+<th scope="row">example_signal_es32</th>
+<td>Passed</td>
+<td>0.38</td>
+<td>Passed</td>
+<td>0.13</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_signal_gl43</th>
+<td>Passed</td>
+<td>0.39</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_signal_gl45</th>
+<td>Passed</td>
+<td>0.37</td>
+<td>Passed</td>
+<td>0.13</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_signal_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.12</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_es31</th>
+<td>Passed</td>
+<td>0.10</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_es32</th>
+<td>Passed</td>
+<td>0.09</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_gl43</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_gl45</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_dynamic_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">runtime_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">async_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">runtime_es31</th>
+<td>Passed</td>
+<td>0.14</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.10</td>
+</tr>
+<tr>
+<th scope="row">runtime_es32</th>
+<td>Passed</td>
+<td>0.15</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">runtime_gl43</th>
+<td>Passed</td>
+<td>0.14</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">runtime_gl45</th>
+<td>Passed</td>
+<td>0.14</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">runtime_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_es31</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.08</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_es32</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_gl43</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_gl45</th>
+<td>Passed</td>
+<td>0.07</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">test_math_gpu_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">math_cpu</th>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+<td>Passed</td>
+<td>0.00</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_cpu</th>
+<td>Passed</td>
+<td>0.35</td>
+<td>Passed</td>
+<td>0.26</td>
+<td>Passed</td>
+<td>0.70</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_es31</th>
+<td>Passed</td>
+<td>0.83</td>
+<td>Passed</td>
+<td>0.49</td>
+<td>Passed</td>
+<td>1.56</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_es32</th>
+<td>Passed</td>
+<td>0.89</td>
+<td>Passed</td>
+<td>0.48</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_gl43</th>
+<td>Passed</td>
+<td>0.81</td>
+<td>Passed</td>
+<td>0.48</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_gl45</th>
+<td>Passed</td>
+<td>0.86</td>
+<td>Passed</td>
+<td>0.47</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_benchmark_gl46</th>
+<td>Skipped</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.46</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_cpu</th>
+<td>Passed</td>
+<td>1.48</td>
+<td>Passed</td>
+<td>0.72</td>
+<td>Passed</td>
+<td>2.11</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_es31</th>
+<td>Passed</td>
+<td>0.82</td>
+<td>Passed</td>
+<td>0.39</td>
+<td>Passed</td>
+<td>2.84</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_es32</th>
+<td>Passed</td>
+<td>0.77</td>
+<td>Passed</td>
+<td>0.41</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_gl43</th>
+<td>Passed</td>
+<td>0.74</td>
+<td>Passed</td>
+<td>0.42</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_gl45</th>
+<td>Passed</td>
+<td>0.74</td>
+<td>Passed</td>
+<td>0.42</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">example_real_data_gl46</th>
+<td>Skipped</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.43</td>
+<td>Skipped</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">glsl_compilation</th>
+<td>Passed</td>
+<td>33.10</td>
+<td>Not configured</td>
+<td>—</td>
+<td>Passed</td>
+<td>30.55</td>
+</tr>
+<tr>
+<th scope="row">header_is_current</th>
+<td>Passed</td>
+<td>0.22</td>
+<td>Passed</td>
+<td>0.03</td>
+<td>Passed</td>
+<td>0.05</td>
+</tr>
+<tr>
+<th scope="row">fixture_integrity</th>
+<td>Passed</td>
+<td>0.31</td>
+<td>Passed</td>
+<td>0.04</td>
+<td>Passed</td>
+<td>0.10</td>
+</tr>
+<tr>
+<th scope="row">shader_frontend</th>
+<td>Passed</td>
+<td>33.38</td>
+<td>Passed</td>
+<td>8.78</td>
+<td>Passed</td>
+<td>27.01</td>
+</tr>
+<tr>
+<th scope="row">transformer_shaders_are_current</th>
+<td>Passed</td>
+<td>0.22</td>
+<td>Passed</td>
+<td>0.02</td>
+<td>Passed</td>
+<td>0.05</td>
+</tr>
+</tbody></table></div></details>
+<details class="log-record"><summary>Complete CTest log · Ryzen 5900X / llvmpipe</summary><p>The two build-directory lines use &lt;build&gt;. Every test name, status, duration, summary and skip record is preserved.</p><pre>Internal ctest changing into directory: &lt;build&gt;
+Test project &lt;build&gt;
+        Start   1: example_pipeline_cpu
+  1/109 Test   #1: example_pipeline_cpu ..............   Passed    0.00 sec
+        Start   2: example_pipeline_es31
+  2/109 Test   #2: example_pipeline_es31 .............   Passed    0.08 sec
+        Start   3: example_pipeline_es32
+  3/109 Test   #3: example_pipeline_es32 .............   Passed    0.07 sec
+        Start   4: example_pipeline_gl43
+  4/109 Test   #4: example_pipeline_gl43 .............   Passed    0.07 sec
+        Start   5: example_pipeline_gl45
+  5/109 Test   #5: example_pipeline_gl45 .............   Passed    0.06 sec
+        Start   6: example_pipeline_gl46
+  6/109 Test   #6: example_pipeline_gl46 .............***Skipped   0.03 sec
+        Start   7: example_images_cpu
+  7/109 Test   #7: example_images_cpu ................   Passed    0.00 sec
+        Start   8: example_images_es31
+  8/109 Test   #8: example_images_es31 ...............   Passed    0.06 sec
+        Start   9: example_images_es32
+  9/109 Test   #9: example_images_es32 ...............   Passed    0.07 sec
+        Start  10: example_images_gl43
+ 10/109 Test  #10: example_images_gl43 ...............   Passed    0.08 sec
+        Start  11: example_images_gl45
+ 11/109 Test  #11: example_images_gl45 ...............   Passed    0.08 sec
+        Start  12: example_images_gl46
+ 12/109 Test  #12: example_images_gl46 ...............***Skipped   0.03 sec
+        Start  13: example_hybrid_cpu
+ 13/109 Test  #13: example_hybrid_cpu ................   Passed    0.00 sec
+        Start  14: example_hybrid_es31
+ 14/109 Test  #14: example_hybrid_es31 ...............   Passed    0.06 sec
+        Start  15: example_hybrid_es32
+ 15/109 Test  #15: example_hybrid_es32 ...............   Passed    0.07 sec
+        Start  16: example_hybrid_gl43
+ 16/109 Test  #16: example_hybrid_gl43 ...............   Passed    0.06 sec
+        Start  17: example_hybrid_gl45
+ 17/109 Test  #17: example_hybrid_gl45 ...............   Passed    0.07 sec
+        Start  18: example_hybrid_gl46
+ 18/109 Test  #18: example_hybrid_gl46 ...............***Skipped   0.03 sec
+        Start  19: example_async_cpu
+ 19/109 Test  #19: example_async_cpu .................   Passed    0.00 sec
+        Start  20: example_async_es31
+ 20/109 Test  #20: example_async_es31 ................   Passed    0.07 sec
+        Start  21: example_async_es32
+ 21/109 Test  #21: example_async_es32 ................   Passed    0.07 sec
+        Start  22: example_async_gl43
+ 22/109 Test  #22: example_async_gl43 ................   Passed    0.07 sec
+        Start  23: example_async_gl45
+ 23/109 Test  #23: example_async_gl45 ................   Passed    0.07 sec
+        Start  24: example_async_gl46
+ 24/109 Test  #24: example_async_gl46 ................***Skipped   0.03 sec
+        Start  25: example_spectral_cpu
+ 25/109 Test  #25: example_spectral_cpu ..............   Passed    0.00 sec
+        Start  26: example_spectral_es31
+ 26/109 Test  #26: example_spectral_es31 .............   Passed    0.08 sec
+        Start  27: example_spectral_es32
+ 27/109 Test  #27: example_spectral_es32 .............   Passed    0.08 sec
+        Start  28: example_spectral_gl43
+ 28/109 Test  #28: example_spectral_gl43 .............   Passed    0.08 sec
+        Start  29: example_spectral_gl45
+ 29/109 Test  #29: example_spectral_gl45 .............   Passed    0.07 sec
+        Start  30: example_spectral_gl46
+ 30/109 Test  #30: example_spectral_gl46 .............***Skipped   0.03 sec
+        Start  31: example_vision_cpu
+ 31/109 Test  #31: example_vision_cpu ................   Passed    0.00 sec
+        Start  32: example_vision_es31
+ 32/109 Test  #32: example_vision_es31 ...............   Passed    0.08 sec
+        Start  33: example_vision_es32
+ 33/109 Test  #33: example_vision_es32 ...............   Passed    0.09 sec
+        Start  34: example_vision_gl43
+ 34/109 Test  #34: example_vision_gl43 ...............   Passed    0.08 sec
+        Start  35: example_vision_gl45
+ 35/109 Test  #35: example_vision_gl45 ...............   Passed    0.08 sec
+        Start  36: example_vision_gl46
+ 36/109 Test  #36: example_vision_gl46 ...............***Skipped   0.04 sec
+        Start  37: example_imaging_cpu
+ 37/109 Test  #37: example_imaging_cpu ...............   Passed    0.00 sec
+        Start  38: example_imaging_es31
+ 38/109 Test  #38: example_imaging_es31 ..............   Passed    0.08 sec
+        Start  39: example_imaging_es32
+ 39/109 Test  #39: example_imaging_es32 ..............   Passed    0.08 sec
+        Start  40: example_imaging_gl43
+ 40/109 Test  #40: example_imaging_gl43 ..............   Passed    0.08 sec
+        Start  41: example_imaging_gl45
+ 41/109 Test  #41: example_imaging_gl45 ..............   Passed    0.09 sec
+        Start  42: example_imaging_gl46
+ 42/109 Test  #42: example_imaging_gl46 ..............***Skipped   0.03 sec
+        Start  43: example_evt3_cpu
+ 43/109 Test  #43: example_evt3_cpu ..................   Passed    0.01 sec
+        Start  44: example_evt3_es31
+ 44/109 Test  #44: example_evt3_es31 .................   Passed    1.97 sec
+        Start  45: example_evt3_es32
+ 45/109 Test  #45: example_evt3_es32 .................   Passed    2.04 sec
+        Start  46: example_evt3_gl43
+ 46/109 Test  #46: example_evt3_gl43 .................   Passed    2.05 sec
+        Start  47: example_evt3_gl45
+ 47/109 Test  #47: example_evt3_gl45 .................   Passed    2.01 sec
+        Start  48: example_evt3_gl46
+ 48/109 Test  #48: example_evt3_gl46 .................***Skipped   0.03 sec
+        Start  49: example_neural_cpu
+ 49/109 Test  #49: example_neural_cpu ................   Passed    0.02 sec
+        Start  50: example_neural_es31
+ 50/109 Test  #50: example_neural_es31 ...............   Passed    0.17 sec
+        Start  51: example_neural_es32
+ 51/109 Test  #51: example_neural_es32 ...............   Passed    0.17 sec
+        Start  52: example_neural_gl43
+ 52/109 Test  #52: example_neural_gl43 ...............   Passed    0.16 sec
+        Start  53: example_neural_gl45
+ 53/109 Test  #53: example_neural_gl45 ...............   Passed    0.17 sec
+        Start  54: example_neural_gl46
+ 54/109 Test  #54: example_neural_gl46 ...............***Skipped   0.03 sec
+        Start  55: example_cnn_cpu
+ 55/109 Test  #55: example_cnn_cpu ...................   Passed    0.32 sec
+        Start  56: example_cnn_es31
+ 56/109 Test  #56: example_cnn_es31 ..................   Passed    0.45 sec
+        Start  57: example_cnn_es32
+ 57/109 Test  #57: example_cnn_es32 ..................   Passed    0.60 sec
+        Start  58: example_cnn_gl43
+ 58/109 Test  #58: example_cnn_gl43 ..................   Passed    0.54 sec
+        Start  59: example_cnn_gl45
+ 59/109 Test  #59: example_cnn_gl45 ..................   Passed    0.58 sec
+        Start  60: example_cnn_gl46
+ 60/109 Test  #60: example_cnn_gl46 ..................***Skipped   0.04 sec
+        Start  61: example_transformer_cpu
+ 61/109 Test  #61: example_transformer_cpu ...........   Passed    0.06 sec
+        Start  62: example_transformer_es31
+ 62/109 Test  #62: example_transformer_es31 ..........   Passed    0.18 sec
+        Start  63: example_transformer_es32
+ 63/109 Test  #63: example_transformer_es32 ..........   Passed    0.23 sec
+        Start  64: example_transformer_gl43
+ 64/109 Test  #64: example_transformer_gl43 ..........   Passed    0.21 sec
+        Start  65: example_transformer_gl45
+ 65/109 Test  #65: example_transformer_gl45 ..........   Passed    0.16 sec
+        Start  66: example_transformer_gl46
+ 66/109 Test  #66: example_transformer_gl46 ..........***Skipped   0.04 sec
+        Start  67: example_signal_cpu
+ 67/109 Test  #67: example_signal_cpu ................   Passed    0.02 sec
+        Start  68: example_signal_es31
+ 68/109 Test  #68: example_signal_es31 ...............   Passed    0.40 sec
+        Start  69: example_signal_es32
+ 69/109 Test  #69: example_signal_es32 ...............   Passed    0.38 sec
+        Start  70: example_signal_gl43
+ 70/109 Test  #70: example_signal_gl43 ...............   Passed    0.39 sec
+        Start  71: example_signal_gl45
+ 71/109 Test  #71: example_signal_gl45 ...............   Passed    0.37 sec
+        Start  72: example_signal_gl46
+ 72/109 Test  #72: example_signal_gl46 ...............***Skipped   0.04 sec
+        Start  73: example_dynamic_cpu
+ 73/109 Test  #73: example_dynamic_cpu ...............   Passed    0.00 sec
+        Start  74: example_dynamic_es31
+ 74/109 Test  #74: example_dynamic_es31 ..............   Passed    0.10 sec
+        Start  75: example_dynamic_es32
+ 75/109 Test  #75: example_dynamic_es32 ..............   Passed    0.09 sec
+        Start  76: example_dynamic_gl43
+ 76/109 Test  #76: example_dynamic_gl43 ..............   Passed    0.07 sec
+        Start  77: example_dynamic_gl45
+ 77/109 Test  #77: example_dynamic_gl45 ..............   Passed    0.07 sec
+        Start  78: example_dynamic_gl46
+ 78/109 Test  #78: example_dynamic_gl46 ..............***Skipped   0.03 sec
+        Start  79: runtime_cpu
+ 79/109 Test  #79: runtime_cpu .......................   Passed    0.00 sec
+        Start  80: async_cpu
+ 80/109 Test  #80: async_cpu .........................   Passed    0.00 sec
+        Start  81: runtime_es31
+ 81/109 Test  #81: runtime_es31 ......................   Passed    0.14 sec
+        Start  82: runtime_es32
+ 82/109 Test  #82: runtime_es32 ......................   Passed    0.15 sec
+        Start  83: runtime_gl43
+ 83/109 Test  #83: runtime_gl43 ......................   Passed    0.14 sec
+        Start  84: runtime_gl45
+ 84/109 Test  #84: runtime_gl45 ......................   Passed    0.14 sec
+        Start  85: runtime_gl46
+ 85/109 Test  #85: runtime_gl46 ......................***Skipped   0.04 sec
+        Start  86: test_math_gpu_cpu
+ 86/109 Test  #86: test_math_gpu_cpu .................   Passed    0.00 sec
+        Start  87: test_math_gpu_es31
+ 87/109 Test  #87: test_math_gpu_es31 ................   Passed    0.07 sec
+        Start  88: test_math_gpu_es32
+ 88/109 Test  #88: test_math_gpu_es32 ................   Passed    0.07 sec
+        Start  89: test_math_gpu_gl43
+ 89/109 Test  #89: test_math_gpu_gl43 ................   Passed    0.07 sec
+        Start  90: test_math_gpu_gl45
+ 90/109 Test  #90: test_math_gpu_gl45 ................   Passed    0.07 sec
+        Start  91: test_math_gpu_gl46
+ 91/109 Test  #91: test_math_gpu_gl46 ................***Skipped   0.03 sec
+        Start  92: math_cpu
+ 92/109 Test  #92: math_cpu ..........................   Passed    0.00 sec
+        Start  93: example_benchmark_cpu
+ 93/109 Test  #93: example_benchmark_cpu .............   Passed    0.35 sec
+        Start  94: example_benchmark_es31
+ 94/109 Test  #94: example_benchmark_es31 ............   Passed    0.83 sec
+        Start  95: example_benchmark_es32
+ 95/109 Test  #95: example_benchmark_es32 ............   Passed    0.89 sec
+        Start  96: example_benchmark_gl43
+ 96/109 Test  #96: example_benchmark_gl43 ............   Passed    0.81 sec
+        Start  97: example_benchmark_gl45
+ 97/109 Test  #97: example_benchmark_gl45 ............   Passed    0.86 sec
+        Start  98: example_benchmark_gl46
+ 98/109 Test  #98: example_benchmark_gl46 ............***Skipped   0.04 sec
+        Start  99: example_real_data_cpu
+ 99/109 Test  #99: example_real_data_cpu .............   Passed    1.48 sec
+        Start 100: example_real_data_es31
+100/109 Test #100: example_real_data_es31 ............   Passed    0.82 sec
+        Start 101: example_real_data_es32
+101/109 Test #101: example_real_data_es32 ............   Passed    0.77 sec
+        Start 102: example_real_data_gl43
+102/109 Test #102: example_real_data_gl43 ............   Passed    0.74 sec
+        Start 103: example_real_data_gl45
+103/109 Test #103: example_real_data_gl45 ............   Passed    0.74 sec
+        Start 104: example_real_data_gl46
+104/109 Test #104: example_real_data_gl46 ............***Skipped   0.03 sec
+        Start 105: glsl_compilation
+105/109 Test #105: glsl_compilation ..................   Passed   33.10 sec
+        Start 106: header_is_current
+106/109 Test #106: header_is_current .................   Passed    0.22 sec
+        Start 107: fixture_integrity
+107/109 Test #107: fixture_integrity .................   Passed    0.31 sec
+        Start 108: shader_frontend
+108/109 Test #108: shader_frontend ...................   Passed   33.38 sec
+        Start 109: transformer_shaders_are_current
+109/109 Test #109: transformer_shaders_are_current ...   Passed    0.22 sec
+
+100% tests passed, 0 tests failed out of 109
+
+Total Test time (real) =  93.14 sec
+
+The following tests did not run:
+	  6 - example_pipeline_gl46 (Skipped)
+	 12 - example_images_gl46 (Skipped)
+	 18 - example_hybrid_gl46 (Skipped)
+	 24 - example_async_gl46 (Skipped)
+	 30 - example_spectral_gl46 (Skipped)
+	 36 - example_vision_gl46 (Skipped)
+	 42 - example_imaging_gl46 (Skipped)
+	 48 - example_evt3_gl46 (Skipped)
+	 54 - example_neural_gl46 (Skipped)
+	 60 - example_cnn_gl46 (Skipped)
+	 66 - example_transformer_gl46 (Skipped)
+	 72 - example_signal_gl46 (Skipped)
+	 78 - example_dynamic_gl46 (Skipped)
+	 85 - runtime_gl46 (Skipped)
+	 91 - test_math_gpu_gl46 (Skipped)
+	 98 - example_benchmark_gl46 (Skipped)
+	104 - example_real_data_gl46 (Skipped)
+</pre></details>
+<details class="log-record"><summary>Complete CTest log · Core i7-1260P / Iris Xe</summary><p>The two build-directory lines use &lt;build&gt;. Every test name, status, duration, summary and skip record is preserved.</p><pre>Internal ctest changing into directory: &lt;build&gt;
+Test project &lt;build&gt;
+        Start   1: example_pipeline_cpu
+  1/108 Test   #1: example_pipeline_cpu ..............   Passed    0.00 sec
+        Start   2: example_pipeline_es31
+  2/108 Test   #2: example_pipeline_es31 .............   Passed    0.04 sec
+        Start   3: example_pipeline_es32
+  3/108 Test   #3: example_pipeline_es32 .............   Passed    0.03 sec
+        Start   4: example_pipeline_gl43
+  4/108 Test   #4: example_pipeline_gl43 .............   Passed    0.03 sec
+        Start   5: example_pipeline_gl45
+  5/108 Test   #5: example_pipeline_gl45 .............   Passed    0.03 sec
+        Start   6: example_pipeline_gl46
+  6/108 Test   #6: example_pipeline_gl46 .............   Passed    0.02 sec
+        Start   7: example_images_cpu
+  7/108 Test   #7: example_images_cpu ................   Passed    0.00 sec
+        Start   8: example_images_es31
+  8/108 Test   #8: example_images_es31 ...............   Passed    0.03 sec
+        Start   9: example_images_es32
+  9/108 Test   #9: example_images_es32 ...............   Passed    0.03 sec
+        Start  10: example_images_gl43
+ 10/108 Test  #10: example_images_gl43 ...............   Passed    0.03 sec
+        Start  11: example_images_gl45
+ 11/108 Test  #11: example_images_gl45 ...............   Passed    0.03 sec
+        Start  12: example_images_gl46
+ 12/108 Test  #12: example_images_gl46 ...............   Passed    0.04 sec
+        Start  13: example_hybrid_cpu
+ 13/108 Test  #13: example_hybrid_cpu ................   Passed    0.00 sec
+        Start  14: example_hybrid_es31
+ 14/108 Test  #14: example_hybrid_es31 ...............   Passed    0.03 sec
+        Start  15: example_hybrid_es32
+ 15/108 Test  #15: example_hybrid_es32 ...............   Passed    0.03 sec
+        Start  16: example_hybrid_gl43
+ 16/108 Test  #16: example_hybrid_gl43 ...............   Passed    0.03 sec
+        Start  17: example_hybrid_gl45
+ 17/108 Test  #17: example_hybrid_gl45 ...............   Passed    0.03 sec
+        Start  18: example_hybrid_gl46
+ 18/108 Test  #18: example_hybrid_gl46 ...............   Passed    0.03 sec
+        Start  19: example_async_cpu
+ 19/108 Test  #19: example_async_cpu .................   Passed    0.00 sec
+        Start  20: example_async_es31
+ 20/108 Test  #20: example_async_es31 ................   Passed    0.03 sec
+        Start  21: example_async_es32
+ 21/108 Test  #21: example_async_es32 ................   Passed    0.03 sec
+        Start  22: example_async_gl43
+ 22/108 Test  #22: example_async_gl43 ................   Passed    0.03 sec
+        Start  23: example_async_gl45
+ 23/108 Test  #23: example_async_gl45 ................   Passed    0.03 sec
+        Start  24: example_async_gl46
+ 24/108 Test  #24: example_async_gl46 ................   Passed    0.03 sec
+        Start  25: example_spectral_cpu
+ 25/108 Test  #25: example_spectral_cpu ..............   Passed    0.00 sec
+        Start  26: example_spectral_es31
+ 26/108 Test  #26: example_spectral_es31 .............   Passed    0.03 sec
+        Start  27: example_spectral_es32
+ 27/108 Test  #27: example_spectral_es32 .............   Passed    0.03 sec
+        Start  28: example_spectral_gl43
+ 28/108 Test  #28: example_spectral_gl43 .............   Passed    0.03 sec
+        Start  29: example_spectral_gl45
+ 29/108 Test  #29: example_spectral_gl45 .............   Passed    0.03 sec
+        Start  30: example_spectral_gl46
+ 30/108 Test  #30: example_spectral_gl46 .............   Passed    0.04 sec
+        Start  31: example_vision_cpu
+ 31/108 Test  #31: example_vision_cpu ................   Passed    0.00 sec
+        Start  32: example_vision_es31
+ 32/108 Test  #32: example_vision_es31 ...............   Passed    0.03 sec
+        Start  33: example_vision_es32
+ 33/108 Test  #33: example_vision_es32 ...............   Passed    0.03 sec
+        Start  34: example_vision_gl43
+ 34/108 Test  #34: example_vision_gl43 ...............   Passed    0.03 sec
+        Start  35: example_vision_gl45
+ 35/108 Test  #35: example_vision_gl45 ...............   Passed    0.03 sec
+        Start  36: example_vision_gl46
+ 36/108 Test  #36: example_vision_gl46 ...............   Passed    0.04 sec
+        Start  37: example_imaging_cpu
+ 37/108 Test  #37: example_imaging_cpu ...............   Passed    0.00 sec
+        Start  38: example_imaging_es31
+ 38/108 Test  #38: example_imaging_es31 ..............   Passed    0.04 sec
+        Start  39: example_imaging_es32
+ 39/108 Test  #39: example_imaging_es32 ..............   Passed    0.03 sec
+        Start  40: example_imaging_gl43
+ 40/108 Test  #40: example_imaging_gl43 ..............   Passed    0.04 sec
+        Start  41: example_imaging_gl45
+ 41/108 Test  #41: example_imaging_gl45 ..............   Passed    0.04 sec
+        Start  42: example_imaging_gl46
+ 42/108 Test  #42: example_imaging_gl46 ..............   Passed    0.04 sec
+        Start  43: example_evt3_cpu
+ 43/108 Test  #43: example_evt3_cpu ..................   Passed    0.01 sec
+        Start  44: example_evt3_es31
+ 44/108 Test  #44: example_evt3_es31 .................   Passed    0.83 sec
+        Start  45: example_evt3_es32
+ 45/108 Test  #45: example_evt3_es32 .................   Passed    0.82 sec
+        Start  46: example_evt3_gl43
+ 46/108 Test  #46: example_evt3_gl43 .................   Passed    0.80 sec
+        Start  47: example_evt3_gl45
+ 47/108 Test  #47: example_evt3_gl45 .................   Passed    0.82 sec
+        Start  48: example_evt3_gl46
+ 48/108 Test  #48: example_evt3_gl46 .................   Passed    0.80 sec
+        Start  49: example_neural_cpu
+ 49/108 Test  #49: example_neural_cpu ................   Passed    0.02 sec
+        Start  50: example_neural_es31
+ 50/108 Test  #50: example_neural_es31 ...............   Passed    0.06 sec
+        Start  51: example_neural_es32
+ 51/108 Test  #51: example_neural_es32 ...............   Passed    0.05 sec
+        Start  52: example_neural_gl43
+ 52/108 Test  #52: example_neural_gl43 ...............   Passed    0.05 sec
+        Start  53: example_neural_gl45
+ 53/108 Test  #53: example_neural_gl45 ...............   Passed    0.05 sec
+        Start  54: example_neural_gl46
+ 54/108 Test  #54: example_neural_gl46 ...............   Passed    0.05 sec
+        Start  55: example_cnn_cpu
+ 55/108 Test  #55: example_cnn_cpu ...................   Passed    0.20 sec
+        Start  56: example_cnn_es31
+ 56/108 Test  #56: example_cnn_es31 ..................   Passed    0.30 sec
+        Start  57: example_cnn_es32
+ 57/108 Test  #57: example_cnn_es32 ..................   Passed    0.29 sec
+        Start  58: example_cnn_gl43
+ 58/108 Test  #58: example_cnn_gl43 ..................   Passed    0.27 sec
+        Start  59: example_cnn_gl45
+ 59/108 Test  #59: example_cnn_gl45 ..................   Passed    0.27 sec
+        Start  60: example_cnn_gl46
+ 60/108 Test  #60: example_cnn_gl46 ..................   Passed    0.29 sec
+        Start  61: example_transformer_cpu
+ 61/108 Test  #61: example_transformer_cpu ...........   Passed    0.04 sec
+        Start  62: example_transformer_es31
+ 62/108 Test  #62: example_transformer_es31 ..........   Passed    0.12 sec
+        Start  63: example_transformer_es32
+ 63/108 Test  #63: example_transformer_es32 ..........   Passed    0.12 sec
+        Start  64: example_transformer_gl43
+ 64/108 Test  #64: example_transformer_gl43 ..........   Passed    0.12 sec
+        Start  65: example_transformer_gl45
+ 65/108 Test  #65: example_transformer_gl45 ..........   Passed    0.12 sec
+        Start  66: example_transformer_gl46
+ 66/108 Test  #66: example_transformer_gl46 ..........   Passed    0.12 sec
+        Start  67: example_signal_cpu
+ 67/108 Test  #67: example_signal_cpu ................   Passed    0.01 sec
+        Start  68: example_signal_es31
+ 68/108 Test  #68: example_signal_es31 ...............   Passed    0.13 sec
+        Start  69: example_signal_es32
+ 69/108 Test  #69: example_signal_es32 ...............   Passed    0.13 sec
+        Start  70: example_signal_gl43
+ 70/108 Test  #70: example_signal_gl43 ...............   Passed    0.12 sec
+        Start  71: example_signal_gl45
+ 71/108 Test  #71: example_signal_gl45 ...............   Passed    0.13 sec
+        Start  72: example_signal_gl46
+ 72/108 Test  #72: example_signal_gl46 ...............   Passed    0.12 sec
+        Start  73: example_dynamic_cpu
+ 73/108 Test  #73: example_dynamic_cpu ...............   Passed    0.00 sec
+        Start  74: example_dynamic_es31
+ 74/108 Test  #74: example_dynamic_es31 ..............   Passed    0.03 sec
+        Start  75: example_dynamic_es32
+ 75/108 Test  #75: example_dynamic_es32 ..............   Passed    0.03 sec
+        Start  76: example_dynamic_gl43
+ 76/108 Test  #76: example_dynamic_gl43 ..............   Passed    0.03 sec
+        Start  77: example_dynamic_gl45
+ 77/108 Test  #77: example_dynamic_gl45 ..............   Passed    0.03 sec
+        Start  78: example_dynamic_gl46
+ 78/108 Test  #78: example_dynamic_gl46 ..............   Passed    0.03 sec
+        Start  79: runtime_cpu
+ 79/108 Test  #79: runtime_cpu .......................   Passed    0.00 sec
+        Start  80: async_cpu
+ 80/108 Test  #80: async_cpu .........................   Passed    0.00 sec
+        Start  81: runtime_es31
+ 81/108 Test  #81: runtime_es31 ......................   Passed    0.04 sec
+        Start  82: runtime_es32
+ 82/108 Test  #82: runtime_es32 ......................   Passed    0.04 sec
+        Start  83: runtime_gl43
+ 83/108 Test  #83: runtime_gl43 ......................   Passed    0.04 sec
+        Start  84: runtime_gl45
+ 84/108 Test  #84: runtime_gl45 ......................   Passed    0.04 sec
+        Start  85: runtime_gl46
+ 85/108 Test  #85: runtime_gl46 ......................   Passed    0.04 sec
+        Start  86: test_math_gpu_cpu
+ 86/108 Test  #86: test_math_gpu_cpu .................   Passed    0.00 sec
+        Start  87: test_math_gpu_es31
+ 87/108 Test  #87: test_math_gpu_es31 ................   Passed    0.03 sec
+        Start  88: test_math_gpu_es32
+ 88/108 Test  #88: test_math_gpu_es32 ................   Passed    0.03 sec
+        Start  89: test_math_gpu_gl43
+ 89/108 Test  #89: test_math_gpu_gl43 ................   Passed    0.03 sec
+        Start  90: test_math_gpu_gl45
+ 90/108 Test  #90: test_math_gpu_gl45 ................   Passed    0.03 sec
+        Start  91: test_math_gpu_gl46
+ 91/108 Test  #91: test_math_gpu_gl46 ................   Passed    0.03 sec
+        Start  92: math_cpu
+ 92/108 Test  #92: math_cpu ..........................   Passed    0.00 sec
+        Start  93: example_benchmark_cpu
+ 93/108 Test  #93: example_benchmark_cpu .............   Passed    0.26 sec
+        Start  94: example_benchmark_es31
+ 94/108 Test  #94: example_benchmark_es31 ............   Passed    0.49 sec
+        Start  95: example_benchmark_es32
+ 95/108 Test  #95: example_benchmark_es32 ............   Passed    0.48 sec
+        Start  96: example_benchmark_gl43
+ 96/108 Test  #96: example_benchmark_gl43 ............   Passed    0.48 sec
+        Start  97: example_benchmark_gl45
+ 97/108 Test  #97: example_benchmark_gl45 ............   Passed    0.47 sec
+        Start  98: example_benchmark_gl46
+ 98/108 Test  #98: example_benchmark_gl46 ............   Passed    0.46 sec
+        Start  99: example_real_data_cpu
+ 99/108 Test  #99: example_real_data_cpu .............   Passed    0.72 sec
+        Start 100: example_real_data_es31
+100/108 Test #100: example_real_data_es31 ............   Passed    0.39 sec
+        Start 101: example_real_data_es32
+101/108 Test #101: example_real_data_es32 ............   Passed    0.41 sec
+        Start 102: example_real_data_gl43
+102/108 Test #102: example_real_data_gl43 ............   Passed    0.42 sec
+        Start 103: example_real_data_gl45
+103/108 Test #103: example_real_data_gl45 ............   Passed    0.42 sec
+        Start 104: example_real_data_gl46
+104/108 Test #104: example_real_data_gl46 ............   Passed    0.43 sec
+        Start 105: header_is_current
+105/108 Test #105: header_is_current .................   Passed    0.03 sec
+        Start 106: fixture_integrity
+106/108 Test #106: fixture_integrity .................   Passed    0.04 sec
+        Start 107: shader_frontend
+107/108 Test #107: shader_frontend ...................   Passed    8.78 sec
+        Start 108: transformer_shaders_are_current
+108/108 Test #108: transformer_shaders_are_current ...   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 108
+
+Total Test time (real) =  23.20 sec
+</pre></details>
+<details class="log-record"><summary>Complete CTest log · Raspberry Pi 5 / V3D</summary><p>The two build-directory lines use &lt;build&gt;. Every test name, status, duration, summary and skip record is preserved.</p><pre>Internal ctest changing into directory: &lt;build&gt;
+Test project &lt;build&gt;
+        Start   1: example_pipeline_cpu
+  1/109 Test   #1: example_pipeline_cpu ..............   Passed    0.00 sec
+        Start   2: example_pipeline_es31
+  2/109 Test   #2: example_pipeline_es31 .............   Passed    0.08 sec
+        Start   3: example_pipeline_es32
+  3/109 Test   #3: example_pipeline_es32 .............***Skipped   0.05 sec
+        Start   4: example_pipeline_gl43
+  4/109 Test   #4: example_pipeline_gl43 .............***Skipped   0.05 sec
+        Start   5: example_pipeline_gl45
+  5/109 Test   #5: example_pipeline_gl45 .............***Skipped   0.05 sec
+        Start   6: example_pipeline_gl46
+  6/109 Test   #6: example_pipeline_gl46 .............***Skipped   0.05 sec
+        Start   7: example_images_cpu
+  7/109 Test   #7: example_images_cpu ................   Passed    0.00 sec
+        Start   8: example_images_es31
+  8/109 Test   #8: example_images_es31 ...............   Passed    0.08 sec
+        Start   9: example_images_es32
+  9/109 Test   #9: example_images_es32 ...............***Skipped   0.05 sec
+        Start  10: example_images_gl43
+ 10/109 Test  #10: example_images_gl43 ...............***Skipped   0.05 sec
+        Start  11: example_images_gl45
+ 11/109 Test  #11: example_images_gl45 ...............***Skipped   0.06 sec
+        Start  12: example_images_gl46
+ 12/109 Test  #12: example_images_gl46 ...............***Skipped   0.05 sec
+        Start  13: example_hybrid_cpu
+ 13/109 Test  #13: example_hybrid_cpu ................   Passed    0.00 sec
+        Start  14: example_hybrid_es31
+ 14/109 Test  #14: example_hybrid_es31 ...............   Passed    0.08 sec
+        Start  15: example_hybrid_es32
+ 15/109 Test  #15: example_hybrid_es32 ...............***Skipped   0.05 sec
+        Start  16: example_hybrid_gl43
+ 16/109 Test  #16: example_hybrid_gl43 ...............***Skipped   0.05 sec
+        Start  17: example_hybrid_gl45
+ 17/109 Test  #17: example_hybrid_gl45 ...............***Skipped   0.05 sec
+        Start  18: example_hybrid_gl46
+ 18/109 Test  #18: example_hybrid_gl46 ...............***Skipped   0.05 sec
+        Start  19: example_async_cpu
+ 19/109 Test  #19: example_async_cpu .................   Passed    0.00 sec
+        Start  20: example_async_es31
+ 20/109 Test  #20: example_async_es31 ................   Passed    0.08 sec
+        Start  21: example_async_es32
+ 21/109 Test  #21: example_async_es32 ................***Skipped   0.05 sec
+        Start  22: example_async_gl43
+ 22/109 Test  #22: example_async_gl43 ................***Skipped   0.05 sec
+        Start  23: example_async_gl45
+ 23/109 Test  #23: example_async_gl45 ................***Skipped   0.05 sec
+        Start  24: example_async_gl46
+ 24/109 Test  #24: example_async_gl46 ................***Skipped   0.05 sec
+        Start  25: example_spectral_cpu
+ 25/109 Test  #25: example_spectral_cpu ..............   Passed    0.00 sec
+        Start  26: example_spectral_es31
+ 26/109 Test  #26: example_spectral_es31 .............   Passed    0.08 sec
+        Start  27: example_spectral_es32
+ 27/109 Test  #27: example_spectral_es32 .............***Skipped   0.05 sec
+        Start  28: example_spectral_gl43
+ 28/109 Test  #28: example_spectral_gl43 .............***Skipped   0.05 sec
+        Start  29: example_spectral_gl45
+ 29/109 Test  #29: example_spectral_gl45 .............***Skipped   0.05 sec
+        Start  30: example_spectral_gl46
+ 30/109 Test  #30: example_spectral_gl46 .............***Skipped   0.05 sec
+        Start  31: example_vision_cpu
+ 31/109 Test  #31: example_vision_cpu ................   Passed    0.00 sec
+        Start  32: example_vision_es31
+ 32/109 Test  #32: example_vision_es31 ...............   Passed    0.08 sec
+        Start  33: example_vision_es32
+ 33/109 Test  #33: example_vision_es32 ...............***Skipped   0.05 sec
+        Start  34: example_vision_gl43
+ 34/109 Test  #34: example_vision_gl43 ...............***Skipped   0.05 sec
+        Start  35: example_vision_gl45
+ 35/109 Test  #35: example_vision_gl45 ...............***Skipped   0.05 sec
+        Start  36: example_vision_gl46
+ 36/109 Test  #36: example_vision_gl46 ...............***Skipped   0.05 sec
+        Start  37: example_imaging_cpu
+ 37/109 Test  #37: example_imaging_cpu ...............   Passed    0.00 sec
+        Start  38: example_imaging_es31
+ 38/109 Test  #38: example_imaging_es31 ..............   Passed    0.08 sec
+        Start  39: example_imaging_es32
+ 39/109 Test  #39: example_imaging_es32 ..............***Skipped   0.05 sec
+        Start  40: example_imaging_gl43
+ 40/109 Test  #40: example_imaging_gl43 ..............***Skipped   0.05 sec
+        Start  41: example_imaging_gl45
+ 41/109 Test  #41: example_imaging_gl45 ..............***Skipped   0.05 sec
+        Start  42: example_imaging_gl46
+ 42/109 Test  #42: example_imaging_gl46 ..............***Skipped   0.05 sec
+        Start  43: example_evt3_cpu
+ 43/109 Test  #43: example_evt3_cpu ..................   Passed    0.02 sec
+        Start  44: example_evt3_es31
+ 44/109 Test  #44: example_evt3_es31 .................   Passed    0.61 sec
+        Start  45: example_evt3_es32
+ 45/109 Test  #45: example_evt3_es32 .................***Skipped   0.05 sec
+        Start  46: example_evt3_gl43
+ 46/109 Test  #46: example_evt3_gl43 .................***Skipped   0.05 sec
+        Start  47: example_evt3_gl45
+ 47/109 Test  #47: example_evt3_gl45 .................***Skipped   0.05 sec
+        Start  48: example_evt3_gl46
+ 48/109 Test  #48: example_evt3_gl46 .................***Skipped   0.05 sec
+        Start  49: example_neural_cpu
+ 49/109 Test  #49: example_neural_cpu ................   Passed    0.03 sec
+        Start  50: example_neural_es31
+ 50/109 Test  #50: example_neural_es31 ...............   Passed    0.12 sec
+        Start  51: example_neural_es32
+ 51/109 Test  #51: example_neural_es32 ...............***Skipped   0.05 sec
+        Start  52: example_neural_gl43
+ 52/109 Test  #52: example_neural_gl43 ...............***Skipped   0.05 sec
+        Start  53: example_neural_gl45
+ 53/109 Test  #53: example_neural_gl45 ...............***Skipped   0.05 sec
+        Start  54: example_neural_gl46
+ 54/109 Test  #54: example_neural_gl46 ...............***Skipped   0.05 sec
+        Start  55: example_cnn_cpu
+ 55/109 Test  #55: example_cnn_cpu ...................   Passed    0.59 sec
+        Start  56: example_cnn_es31
+ 56/109 Test  #56: example_cnn_es31 ..................   Passed    0.80 sec
+        Start  57: example_cnn_es32
+ 57/109 Test  #57: example_cnn_es32 ..................***Skipped   0.05 sec
+        Start  58: example_cnn_gl43
+ 58/109 Test  #58: example_cnn_gl43 ..................***Skipped   0.05 sec
+        Start  59: example_cnn_gl45
+ 59/109 Test  #59: example_cnn_gl45 ..................***Skipped   0.05 sec
+        Start  60: example_cnn_gl46
+ 60/109 Test  #60: example_cnn_gl46 ..................***Skipped   0.05 sec
+        Start  61: example_transformer_cpu
+ 61/109 Test  #61: example_transformer_cpu ...........   Passed    0.09 sec
+        Start  62: example_transformer_es31
+ 62/109 Test  #62: example_transformer_es31 ..........   Passed    0.21 sec
+        Start  63: example_transformer_es32
+ 63/109 Test  #63: example_transformer_es32 ..........***Skipped   0.05 sec
+        Start  64: example_transformer_gl43
+ 64/109 Test  #64: example_transformer_gl43 ..........***Skipped   0.05 sec
+        Start  65: example_transformer_gl45
+ 65/109 Test  #65: example_transformer_gl45 ..........***Skipped   0.05 sec
+        Start  66: example_transformer_gl46
+ 66/109 Test  #66: example_transformer_gl46 ..........***Skipped   0.05 sec
+        Start  67: example_signal_cpu
+ 67/109 Test  #67: example_signal_cpu ................   Passed    0.03 sec
+        Start  68: example_signal_es31
+ 68/109 Test  #68: example_signal_es31 ...............   Passed    0.20 sec
+        Start  69: example_signal_es32
+ 69/109 Test  #69: example_signal_es32 ...............***Skipped   0.05 sec
+        Start  70: example_signal_gl43
+ 70/109 Test  #70: example_signal_gl43 ...............***Skipped   0.05 sec
+        Start  71: example_signal_gl45
+ 71/109 Test  #71: example_signal_gl45 ...............***Skipped   0.05 sec
+        Start  72: example_signal_gl46
+ 72/109 Test  #72: example_signal_gl46 ...............***Skipped   0.05 sec
+        Start  73: example_dynamic_cpu
+ 73/109 Test  #73: example_dynamic_cpu ...............   Passed    0.00 sec
+        Start  74: example_dynamic_es31
+ 74/109 Test  #74: example_dynamic_es31 ..............   Passed    0.08 sec
+        Start  75: example_dynamic_es32
+ 75/109 Test  #75: example_dynamic_es32 ..............***Skipped   0.05 sec
+        Start  76: example_dynamic_gl43
+ 76/109 Test  #76: example_dynamic_gl43 ..............***Skipped   0.05 sec
+        Start  77: example_dynamic_gl45
+ 77/109 Test  #77: example_dynamic_gl45 ..............***Skipped   0.05 sec
+        Start  78: example_dynamic_gl46
+ 78/109 Test  #78: example_dynamic_gl46 ..............***Skipped   0.05 sec
+        Start  79: runtime_cpu
+ 79/109 Test  #79: runtime_cpu .......................   Passed    0.00 sec
+        Start  80: async_cpu
+ 80/109 Test  #80: async_cpu .........................   Passed    0.00 sec
+        Start  81: runtime_es31
+ 81/109 Test  #81: runtime_es31 ......................   Passed    0.10 sec
+        Start  82: runtime_es32
+ 82/109 Test  #82: runtime_es32 ......................***Skipped   0.05 sec
+        Start  83: runtime_gl43
+ 83/109 Test  #83: runtime_gl43 ......................***Skipped   0.05 sec
+        Start  84: runtime_gl45
+ 84/109 Test  #84: runtime_gl45 ......................***Skipped   0.05 sec
+        Start  85: runtime_gl46
+ 85/109 Test  #85: runtime_gl46 ......................***Skipped   0.05 sec
+        Start  86: test_math_gpu_cpu
+ 86/109 Test  #86: test_math_gpu_cpu .................   Passed    0.00 sec
+        Start  87: test_math_gpu_es31
+ 87/109 Test  #87: test_math_gpu_es31 ................   Passed    0.08 sec
+        Start  88: test_math_gpu_es32
+ 88/109 Test  #88: test_math_gpu_es32 ................***Skipped   0.05 sec
+        Start  89: test_math_gpu_gl43
+ 89/109 Test  #89: test_math_gpu_gl43 ................***Skipped   0.05 sec
+        Start  90: test_math_gpu_gl45
+ 90/109 Test  #90: test_math_gpu_gl45 ................***Skipped   0.05 sec
+        Start  91: test_math_gpu_gl46
+ 91/109 Test  #91: test_math_gpu_gl46 ................***Skipped   0.05 sec
+        Start  92: math_cpu
+ 92/109 Test  #92: math_cpu ..........................   Passed    0.00 sec
+        Start  93: example_benchmark_cpu
+ 93/109 Test  #93: example_benchmark_cpu .............   Passed    0.70 sec
+        Start  94: example_benchmark_es31
+ 94/109 Test  #94: example_benchmark_es31 ............   Passed    1.56 sec
+        Start  95: example_benchmark_es32
+ 95/109 Test  #95: example_benchmark_es32 ............***Skipped   0.05 sec
+        Start  96: example_benchmark_gl43
+ 96/109 Test  #96: example_benchmark_gl43 ............***Skipped   0.05 sec
+        Start  97: example_benchmark_gl45
+ 97/109 Test  #97: example_benchmark_gl45 ............***Skipped   0.05 sec
+        Start  98: example_benchmark_gl46
+ 98/109 Test  #98: example_benchmark_gl46 ............***Skipped   0.05 sec
+        Start  99: example_real_data_cpu
+ 99/109 Test  #99: example_real_data_cpu .............   Passed    2.11 sec
+        Start 100: example_real_data_es31
+100/109 Test #100: example_real_data_es31 ............   Passed    2.84 sec
+        Start 101: example_real_data_es32
+101/109 Test #101: example_real_data_es32 ............***Skipped   0.05 sec
+        Start 102: example_real_data_gl43
+102/109 Test #102: example_real_data_gl43 ............***Skipped   0.05 sec
+        Start 103: example_real_data_gl45
+103/109 Test #103: example_real_data_gl45 ............***Skipped   0.05 sec
+        Start 104: example_real_data_gl46
+104/109 Test #104: example_real_data_gl46 ............***Skipped   0.05 sec
+        Start 105: glsl_compilation
+105/109 Test #105: glsl_compilation ..................   Passed   30.55 sec
+        Start 106: header_is_current
+106/109 Test #106: header_is_current .................   Passed    0.05 sec
+        Start 107: fixture_integrity
+107/109 Test #107: fixture_integrity .................   Passed    0.10 sec
+        Start 108: shader_frontend
+108/109 Test #108: shader_frontend ...................   Passed   27.01 sec
+        Start 109: transformer_shaders_are_current
+109/109 Test #109: transformer_shaders_are_current ...   Passed    0.05 sec
+
+100% tests passed, 0 tests failed out of 109
+
+Total Test time (real) =  71.98 sec
+
+The following tests did not run:
+	  3 - example_pipeline_es32 (Skipped)
+	  4 - example_pipeline_gl43 (Skipped)
+	  5 - example_pipeline_gl45 (Skipped)
+	  6 - example_pipeline_gl46 (Skipped)
+	  9 - example_images_es32 (Skipped)
+	 10 - example_images_gl43 (Skipped)
+	 11 - example_images_gl45 (Skipped)
+	 12 - example_images_gl46 (Skipped)
+	 15 - example_hybrid_es32 (Skipped)
+	 16 - example_hybrid_gl43 (Skipped)
+	 17 - example_hybrid_gl45 (Skipped)
+	 18 - example_hybrid_gl46 (Skipped)
+	 21 - example_async_es32 (Skipped)
+	 22 - example_async_gl43 (Skipped)
+	 23 - example_async_gl45 (Skipped)
+	 24 - example_async_gl46 (Skipped)
+	 27 - example_spectral_es32 (Skipped)
+	 28 - example_spectral_gl43 (Skipped)
+	 29 - example_spectral_gl45 (Skipped)
+	 30 - example_spectral_gl46 (Skipped)
+	 33 - example_vision_es32 (Skipped)
+	 34 - example_vision_gl43 (Skipped)
+	 35 - example_vision_gl45 (Skipped)
+	 36 - example_vision_gl46 (Skipped)
+	 39 - example_imaging_es32 (Skipped)
+	 40 - example_imaging_gl43 (Skipped)
+	 41 - example_imaging_gl45 (Skipped)
+	 42 - example_imaging_gl46 (Skipped)
+	 45 - example_evt3_es32 (Skipped)
+	 46 - example_evt3_gl43 (Skipped)
+	 47 - example_evt3_gl45 (Skipped)
+	 48 - example_evt3_gl46 (Skipped)
+	 51 - example_neural_es32 (Skipped)
+	 52 - example_neural_gl43 (Skipped)
+	 53 - example_neural_gl45 (Skipped)
+	 54 - example_neural_gl46 (Skipped)
+	 57 - example_cnn_es32 (Skipped)
+	 58 - example_cnn_gl43 (Skipped)
+	 59 - example_cnn_gl45 (Skipped)
+	 60 - example_cnn_gl46 (Skipped)
+	 63 - example_transformer_es32 (Skipped)
+	 64 - example_transformer_gl43 (Skipped)
+	 65 - example_transformer_gl45 (Skipped)
+	 66 - example_transformer_gl46 (Skipped)
+	 69 - example_signal_es32 (Skipped)
+	 70 - example_signal_gl43 (Skipped)
+	 71 - example_signal_gl45 (Skipped)
+	 72 - example_signal_gl46 (Skipped)
+	 75 - example_dynamic_es32 (Skipped)
+	 76 - example_dynamic_gl43 (Skipped)
+	 77 - example_dynamic_gl45 (Skipped)
+	 78 - example_dynamic_gl46 (Skipped)
+	 82 - runtime_es32 (Skipped)
+	 83 - runtime_gl43 (Skipped)
+	 84 - runtime_gl45 (Skipped)
+	 85 - runtime_gl46 (Skipped)
+	 88 - test_math_gpu_es32 (Skipped)
+	 89 - test_math_gpu_gl43 (Skipped)
+	 90 - test_math_gpu_gl45 (Skipped)
+	 91 - test_math_gpu_gl46 (Skipped)
+	 95 - example_benchmark_es32 (Skipped)
+	 96 - example_benchmark_gl43 (Skipped)
+	 97 - example_benchmark_gl45 (Skipped)
+	 98 - example_benchmark_gl46 (Skipped)
+	101 - example_real_data_es32 (Skipped)
+	102 - example_real_data_gl43 (Skipped)
+	103 - example_real_data_gl45 (Skipped)
+	104 - example_real_data_gl46 (Skipped)
+</pre></details>
+<h3>Frontend and offline shader compilation</h3><p><strong>Eight frontend regression tests passed.</strong> They check lexical declaration handling, language-subset diagnostics, generated C++ semantics, numeric promotions across profiles, private global initialization per invocation, fixed arrays and helper parameters, descriptor defaults and push constants, and constant-shadowing behavior.</p>
+<details class="log-record"><summary>Frontend regression output · eight tests</summary><p>The named registered shader_frontend case above runs these regression groups.</p><pre>........
+----------------------------------------------------------------------
+Ran 8 tests in 23.273s
+
+OK
+</pre></details>
+<p><strong>All 250 bundled shader/profile compiler checks passed</strong> where glslang was configured: 50 native modules × five language profiles. These offline checks establish language compatibility. The runtime records above describe execution on each available graphics context. The complete public collection is a separate <a href="corpus.html">664-record compiler report</a>, with 258 inputs accepted by C++11 and all five generated profiles.</p>
+<details><summary>All 50 bundled modules and their five compiler profiles</summary><div class="table-wrap"><table id="offline-shaders"><caption>Aggregate successful offline run resolved by native module and profile</caption><thead><tr>
+<th scope="col">Native module</th>
+<th scope="col">ES 3.10</th>
+<th scope="col">ES 3.20</th>
+<th scope="col">GLSL 4.30</th>
+<th scope="col">GLSL 4.50</th>
+<th scope="col">GLSL 4.60</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">affine.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">ann_gradient.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">ann_infer.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">bayer_unpack.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">blur.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">buffer_to_image.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">clamp.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">cnn_gradient.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">cnn_infer.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">convolution2d.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">convolution3d.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">debayer.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">dft_columns.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">dft_rows.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">evt3_emit.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">evt3_flow.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">evt3_reset.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">evt3_seed.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">evt3_summary.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">fft_bit_reverse.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">fft_butterfly.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">gaussian_horizontal.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">gaussian_vertical.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">harris_response.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">harris_tensor.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">image_to_buffer.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">lenet_conv.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">lenet_dense.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">lenet_pool.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">luminance.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">math.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">nn_binary_loss.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">nn_sgd.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">nonmax.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rgba_float_image.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rgba_int_image.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rgba_uint_image.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rle_count.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rle_decode.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rle_encode.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">rle_offsets.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">scalar_images.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">signal_biquad.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">signal_fir.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">signal_frequency_mask.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">signal_window.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">sobel.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">sum.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">transformer_gradient.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<th scope="row">transformer_infer.cpp</th>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+</tbody></table></div></details></section>
+<section id="fixtures"><h2>Actual public inputs</h2><p>These images and waveforms come from the prepared files used by the examples. The ECG panel labels an independently calculated 65-tap Hamming-sinc low-pass reference and its real Fourier spectrum. The input source, units and transformations are documented in <a href="datasets.html">Public datasets</a>.</p>
+<figure class="report-figure"><a href="plots/public-fixtures.svg" aria-label="Open standalone SVG: Actual NASA image, PhysioNet ECG with independent filter and Fourier references, and official digit samples"><img src="plots/public-fixtures.svg" alt="Actual NASA image, PhysioNet ECG with independent filter and Fourier references, and official digit samples" loading="lazy"></a><figcaption>NASA Blue Marble RGB preview, PhysioNet MIT-BIH record 100 MLII at 360 Hz in millivolts, and the first shipped instance of each MNIST class. FIR filtering is causal with a zero prefix and 40 Hz cutoff. The digit labels come from the official annotations. Credits and source terms are in the data guide. <a href="plots/public-fixtures.svg" download>Download SVG</a></figcaption></figure>
+</section><section id="provenance"><h2>Methods, fingerprints and reproducibility</h2><details><summary>Complete archived model, dataset and evaluation metadata</summary><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>schema_version</code></th><td><span data-report-path="$.schema_version" data-report-type="number">1</span></td></tr><tr><th scope="row"><code>measurement_date</code></th><td><span data-report-path="$.measurement_date" data-report-type="string">2026-10-15</span></td></tr><tr><th scope="row"><code>header_sha256</code></th><td><span data-report-path="$.header_sha256" data-report-type="string">0555b3742fa5646d094747786a9d90bbda334bf0dfbf35c639b359224f571416</span></td></tr><tr><th scope="row"><code>frontend_sha256</code></th><td><span data-report-path="$.frontend_sha256" data-report-type="string">9aedc85bb057bf22411fc0ae0adc115e57b38640b1fdad4de9838208566d783e</span></td></tr><tr><th scope="row"><code>shader_profile</code></th><td><span data-report-path="$.shader_profile" data-report-type="string">es31</span></td></tr><tr><th scope="row"><code>model</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>architecture</code></th><td><span data-report-path="$.model.architecture" data-report-type="string">Modern LeNet-5-style with full C3 connectivity, ReLU, fixed average pooling and linear logits</span></td></tr><tr><th scope="row"><code>parameters</code></th><td><span data-report-path="$.model.parameters" data-report-type="number">61706</span></td></tr><tr><th scope="row"><code>weights_sha256</code></th><td><span data-report-path="$.model.weights_sha256" data-report-type="string">327dd259df961e6ed9b8f9fc82d2cd56b1334ca7525f92403de9c6495d1fe8de</span></td></tr><tr><th scope="row"><code>independent_reference_sha256</code></th><td><span data-report-path="$.model.independent_reference_sha256" data-report-type="string">e3623237df15d5671dbb5cfd04c072d58f3d14a31bc04fd6b80c1d29026195e5</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>dataset</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>name</code></th><td><span data-report-path="$.dataset.name" data-report-type="string">Official MNIST held-out test split</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.dataset.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>image_archive_sha256</code></th><td><span data-report-path="$.dataset.image_archive_sha256" data-report-type="string">8d422c7b0a1c1c79245a5bcf07fe86e33eeafee792b84584aec276f5a2dbc4e6</span></td></tr><tr><th scope="row"><code>label_archive_sha256</code></th><td><span data-report-path="$.dataset.label_archive_sha256" data-report-type="string">f7ae60f92e00ec6debd23a6088c31dbd2371eca3ffa0defaefb259924204aec6</span></td></tr><tr><th scope="row"><code>input_scale</code></th><td><span data-report-path="$.dataset.input_scale" data-report-type="string">byte / 255 with a two-pixel zero border</span></td></tr><tr><th scope="row"><code>sample_order</code></th><td><span data-report-path="$.dataset.sample_order" data-report-type="string">All original test images in their original order</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>method</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>batch_limit</code></th><td><span data-report-path="$.method.batch_limit" data-report-type="number">128</span></td></tr><tr><th scope="row"><code>normalized_error</code></th><td><span data-report-path="$.method.normalized_error" data-report-type="string">abs(actual-reference)/(1+abs(reference)), maximum across all 100000 class scores</span></td></tr><tr><th scope="row"><code>evaluation_time_scope</code></th><td><span data-report-path="$.method.evaluation_time_scope" data-report-type="string">Batch construction, input normalization, program setup, native inference, result reads and reference comparisons. Initial dataset file reads are excluded.</span></td></tr><tr><th scope="row"><code>resident_benchmark_is_separate</code></th><td><span data-report-path="$.method.resident_benchmark_is_separate" data-report-type="boolean">true</span></td></tr><tr><th scope="row"><code>all_public_data_cases_passed</code></th><td><span data-report-path="$.method.all_public_data_cases_passed" data-report-type="boolean">true</span></td></tr><tr><th scope="row"><code>bundled_adapters_unchanged_after_frontend_update</code></th><td><span data-report-path="$.method.bundled_adapters_unchanged_after_frontend_update" data-report-type="boolean">true</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>measurements</code></th><td><ol><li><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>configuration</code></th><td><span data-report-path="$.measurements[0].configuration" data-report-type="string">amd</span></td></tr><tr><th scope="row"><code>cpu_model</code></th><td><span data-report-path="$.measurements[0].cpu_model" data-report-type="string">AMD Ryzen 9 5900X</span></td></tr><tr><th scope="row"><code>renderer</code></th><td><span data-report-path="$.measurements[0].renderer" data-report-type="string">llvmpipe (LLVM 20.1.2, 256 bits)</span></td></tr><tr><th scope="row"><code>graphics_kind</code></th><td><span data-report-path="$.measurements[0].graphics_kind" data-report-type="string">software on CPU</span></td></tr><tr><th scope="row"><code>label</code></th><td><span data-report-path="$.measurements[0].label" data-report-type="string">Ryzen 5900X / llvmpipe</span></td></tr><tr><th scope="row"><code>cpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[0].cpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[0].cpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[0].cpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[0].cpu.maximum_normalized_logit_error" data-report-type="number">4.57699e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[0].cpu.completed_evaluation_seconds" data-report-type="number">17.2063</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>gpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[0].gpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[0].gpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[0].gpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[0].gpu.maximum_normalized_logit_error" data-report-type="number">4.57699e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[0].gpu.completed_evaluation_seconds" data-report-type="number">1.76238</span></td></tr></tbody></table></div></td></tr></tbody></table></div></li><li><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>configuration</code></th><td><span data-report-path="$.measurements[1].configuration" data-report-type="string">intel</span></td></tr><tr><th scope="row"><code>cpu_model</code></th><td><span data-report-path="$.measurements[1].cpu_model" data-report-type="string">Intel Core i7-1260P</span></td></tr><tr><th scope="row"><code>renderer</code></th><td><span data-report-path="$.measurements[1].renderer" data-report-type="string">Mesa Intel Iris Xe Graphics (ADL GT2)</span></td></tr><tr><th scope="row"><code>graphics_kind</code></th><td><span data-report-path="$.measurements[1].graphics_kind" data-report-type="string">hardware</span></td></tr><tr><th scope="row"><code>label</code></th><td><span data-report-path="$.measurements[1].label" data-report-type="string">Core i7-1260P / Iris Xe</span></td></tr><tr><th scope="row"><code>cpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[1].cpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[1].cpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[1].cpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[1].cpu.maximum_normalized_logit_error" data-report-type="number">4.57699e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[1].cpu.completed_evaluation_seconds" data-report-type="number">13.8871</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>gpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[1].gpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[1].gpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[1].gpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[1].gpu.maximum_normalized_logit_error" data-report-type="number">4.00418e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[1].gpu.completed_evaluation_seconds" data-report-type="number">1.95504</span></td></tr></tbody></table></div></td></tr></tbody></table></div></li><li><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>configuration</code></th><td><span data-report-path="$.measurements[2].configuration" data-report-type="string">pi</span></td></tr><tr><th scope="row"><code>cpu_model</code></th><td><span data-report-path="$.measurements[2].cpu_model" data-report-type="string">Raspberry Pi 5, four Cortex-A76 cores</span></td></tr><tr><th scope="row"><code>renderer</code></th><td><span data-report-path="$.measurements[2].renderer" data-report-type="string">Broadcom V3D 7.1.7.0</span></td></tr><tr><th scope="row"><code>graphics_kind</code></th><td><span data-report-path="$.measurements[2].graphics_kind" data-report-type="string">hardware</span></td></tr><tr><th scope="row"><code>label</code></th><td><span data-report-path="$.measurements[2].label" data-report-type="string">Pi 5 / V3D</span></td></tr><tr><th scope="row"><code>cpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[2].cpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[2].cpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[2].cpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[2].cpu.maximum_normalized_logit_error" data-report-type="number">4.00418e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[2].cpu.completed_evaluation_seconds" data-report-type="number">35.0628</span></td></tr></tbody></table></div></td></tr><tr><th scope="row"><code>gpu</code></th><td><div class="table-wrap"><table class="field-table"><tbody><tr><th scope="row"><code>correct</code></th><td><span data-report-path="$.measurements[2].gpu.correct" data-report-type="number">9778</span></td></tr><tr><th scope="row"><code>images</code></th><td><span data-report-path="$.measurements[2].gpu.images" data-report-type="number">10000</span></td></tr><tr><th scope="row"><code>accuracy_percent</code></th><td><span data-report-path="$.measurements[2].gpu.accuracy_percent" data-report-type="number">97.78</span></td></tr><tr><th scope="row"><code>maximum_normalized_logit_error</code></th><td><span data-report-path="$.measurements[2].gpu.maximum_normalized_logit_error" data-report-type="number">4.57699e-06</span></td></tr><tr><th scope="row"><code>completed_evaluation_seconds</code></th><td><span data-report-path="$.measurements[2].gpu.completed_evaluation_seconds" data-report-type="number">41.5901</span></td></tr></tbody></table></div></td></tr></tbody></table></div></li></ol></td></tr><tr><th scope="row"><code>measurement_frontend_sha256</code></th><td><span data-report-path="$.measurement_frontend_sha256" data-report-type="string">2273a940ee6c6796660d4507977769cf471bb29ad6010b8178bda0905e0a590a</span></td></tr></tbody></table></div></details><p>Measurements were recorded on 15 October 2026. Benchmark means retain the original three-decimal output. Evaluation values retain their printed precision. Exact values accompany each figure.</p><p>The figures show the recorded mean timings, exact independent-framework confusion counts, and initial and final training losses. Hardware and software graphics paths are labeled explicitly.</p>
+<div class="table-wrap"><table id="implementation-provenance"><caption>Recorded implementation, model and dataset identities</caption><thead><tr>
+<th scope="col">Record</th>
+<th scope="col">Value</th>
+</tr></thead><tbody>
+<tr>
+<th scope="row">Measured runtime header SHA-256</th>
+<td>0555b3742fa5646d094747786a9d90bbda334bf0dfbf35c639b359224f571416</td>
+</tr>
+<tr>
+<th scope="row">Recorded corpus/frontend SHA-256</th>
+<td>9aedc85bb057bf22411fc0ae0adc115e57b38640b1fdad4de9838208566d783e</td>
+</tr>
+<tr>
+<th scope="row">Timing/evaluation frontend SHA-256</th>
+<td>2273a940ee6c6796660d4507977769cf471bb29ad6010b8178bda0905e0a590a</td>
+</tr>
+<tr>
+<th scope="row">Publication frontend SHA-256</th>
+<td>d50c74eee1d0742c96ef2695279c3ac3d4b4035e503bf31912e97a244237ac2c</td>
+</tr>
+<tr>
+<th scope="row">Model weights SHA-256</th>
+<td>327dd259df961e6ed9b8f9fc82d2cd56b1334ca7525f92403de9c6495d1fe8de</td>
+</tr>
+<tr>
+<th scope="row">Independent reference logits SHA-256</th>
+<td>e3623237df15d5671dbb5cfd04c072d58f3d14a31bc04fd6b80c1d29026195e5</td>
+</tr>
+<tr>
+<th scope="row">Official test-image archive SHA-256</th>
+<td>8d422c7b0a1c1c79245a5bcf07fe86e33eeafee792b84584aec276f5a2dbc4e6</td>
+</tr>
+<tr>
+<th scope="row">Official test-label archive SHA-256</th>
+<td>f7ae60f92e00ec6debd23a6088c31dbd2371eca3ffa0defaefb259924204aec6</td>
+</tr>
+<tr>
+<th scope="row">Input normalization</th>
+<td>byte / 255 with a two-pixel zero border</td>
+</tr>
+<tr>
+<th scope="row">Test sample order</th>
+<td>All original test images in their original order</td>
+</tr>
+<tr>
+<th scope="row">Evaluation batch limit</th>
+<td>128</td>
+</tr>
+<tr>
+<th scope="row">Normalized error definition</th>
+<td>abs(actual-reference)/(1+abs(reference)), maximum across all 100000 class scores</td>
+</tr>
+</tbody></table></div>
+<p>Inspect the <a href="source/index.html">library and example sources</a>, <a href="source/scripts/data_sources.py.html">public input metadata</a>, and <a href="corpus.html#provenance">corpus compiler provenance</a> for the inputs and tools behind these checks.</p>
+<p><strong>schema version:</strong> 1</p>
+<p><strong>measurement date:</strong> 2026-10-15</p>
+<p><strong>shader profile:</strong> es31</p>
+</section></main></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a></p></footer></body></html>

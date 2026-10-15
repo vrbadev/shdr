@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Asynchronous pipeline execution"><title>Asynchronous pipeline execution · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="asynchronous-pipeline-execution">Asynchronous pipeline execution</h1>
+<p>Separate submission, completion and result access when an application needs to
+keep responding while compute work runs. GPU pipelines return a fence handle.
+CPU pipelines can run on a bounded worker pool. The shader source and resource
+bindings remain the same.</p>
+<p>The <a href="source/examples/async.cpp.html">async example</a> processes thirty-two frames through
+three reusable slots and verifies each result on both backends:</p>
+<pre><code class="language-sh"><span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_async
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_async<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<h2 id="enqueue-a-gpu-pipeline">Enqueue a GPU pipeline</h2>
+<p>Create the device on the thread that will issue GPU calls. The optional EGL
+backend needs <code>SHDR_ENABLE_EGL=1</code> and an EGL link library. The CMake <code>shdr::egl</code>
+target supplies both.</p>
+<pre><code class="language-cpp"><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">headless_device</span><span class="tok-w"> </span><span class="tok-n">gpu</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create a headless ES 3.1 device.</span>
+<span class="tok-n">pipeline</span><span class="tok-p">.</span><span class="tok-n">prepare</span><span class="tok-p">(</span><span class="tok-n">gpu</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Compile GPU programs and upload initial resources.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">completion</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-p">.</span><span class="tok-n">submit</span><span class="tok-p">(</span><span class="tok-n">gpu</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Enqueue work and keep its completion handle.</span>
+<span class="tok-c1">// Do other application work, then poll on this same context thread.</span>
+<span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">completion</span><span class="tok-p">.</span><span class="tok-n">ready</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Poll the completion fence with a zero timeout.</span>
+<span class="tok-w"> </span><span class="tok-c1">// Queued dispatches have completed.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// Continue application work while GPU work is pending.</span>
+</code></pre>
+<p><code>prepare</code> compiles GPU programs and creates or uploads their bound resources. Call it before a processing loop, and prepare newly bound or host-modified resources as needed. <code>submit</code> queues GPU stages, inserts a fence, flushes the command stream and returns a completion handle. Use <code>run(device)</code> for pipelines that include explicit CPU stages.</p>
+<p><code>submission</code> is movable. <code>ready()</code> uses a zero-timeout fence query. For an
+explicitly bounded wait:</p>
+<pre><code class="language-cpp"><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">status</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">completion</span><span class="tok-p">.</span><span class="tok-n">wait</span><span class="tok-p">(</span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">chrono</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">milliseconds</span><span class="tok-p">(</span><span class="tok-mi">1</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Request a one-millisecond fence-wait timeout.</span>
+<span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">status</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">wait_status</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">timeout</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Handle work that is still pending after the time limit.</span>
+<span class="tok-w"> </span><span class="tok-c1">// Keep this slot in flight and try again later.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// The timeout leaves the submission and its resources alive.</span>
+</code></pre>
+<p>Calling <code>wait()</code> waits until completion. An empty submission is already complete. Driver failures throw <code>shdr::error</code>.</p>
+<p>Releasing a submission handle leaves its pending programs and resources retained until the device retires the fence. Call <code>device.collect_garbage()</code> on the context thread during an application loop to poll completion and release retired objects. Device operations also perform this collection.</p>
+<h2 id="use-a-finite-ring-of-resource-slots">Use a finite ring of resource slots</h2>
+<p>Allocate a small fixed number of input, intermediate and output resource sets.
+Each slot has a pipeline bound to that set and its own completion handle:</p>
+<ol>
+<li>Select a free slot. Skip or defer the incoming item when none is free.</li>
+<li>Update its inputs, prepare newly bound or modified resources if appropriate,
+and call <code>submit</code>.</li>
+<li>Poll existing handles on the context thread.</li>
+<li>Read or recycle a slot only after its submission completes.</li>
+</ol>
+<p>Use stable inputs and distinct writable storage for every in-flight slot. Resource-wrapper copies share the same storage, so allocate a separate resource set for each slot. Kernel uniform and binding changes after <code>submit</code> affect later submissions. Issued GL commands retain their original bindings.</p>
+<p>A ready fence indicates shader completion. <code>buffer.data()</code> and <code>image2d.data()</code> transfer newer GPU contents to host memory when needed. Include that transfer cost in the application budget. Place readbacks, allocation and shader compilation at planned points around a latency-sensitive processing loop.</p>
+<h2 id="run-cpu-jobs-on-background-workers">Run CPU jobs on background workers</h2>
+<p>A CPU executor accepts pipelines with host-ready resources and returns futures:</p>
+<pre><code class="language-cpp"><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">executor</span><span class="tok-w"> </span><span class="tok-nf">workers</span><span class="tok-p">(</span><span class="tok-mi">2</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">8</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create two CPU workers and allow eight queued jobs.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">finished</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">workers</span><span class="tok-p">.</span><span class="tok-n">submit</span><span class="tok-p">(</span><span class="tok-n">cpu_pipeline</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Submit an independent CPU pipeline snapshot.</span>
+<span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">finished</span><span class="tok-p">.</span><span class="tok-n">wait_for</span><span class="tok-p">(</span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">chrono</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">seconds</span><span class="tok-p">(</span><span class="tok-mi">0</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">future_status</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">ready</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Poll the CPU future with a zero timeout.</span>
+<span class="tok-w"> </span><span class="tok-n">finished</span><span class="tok-p">.</span><span class="tok-n">get</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Report a shader exception, or consume the completed result.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// Keep doing application work while the job is pending.</span>
+<span class="tok-c1">// At application shutdown:</span>
+<span class="tok-n">workers</span><span class="tok-p">.</span><span class="tok-n">shutdown</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Explicitly join workers when application processing ends.</span>
+</code></pre>
+<p>The first constructor argument sets the worker count. The second limits pending jobs, while running jobs are tracked separately. Use positive counts and handle <code>shdr::error</code> for a full queue or closed executor. Submission snapshots shader instances, uniforms and bindings before enqueueing. Each worker has independent invocation state and shared resource storage. Later kernel changes affect subsequent jobs.</p>
+<p>CPU submissions require host-ready inputs and CPU-compatible stages. Download newer GPU contents on the device context thread before enqueueing a CPU job. Concurrent jobs can share immutable inputs and require distinct writable resources. Read or modify a job's output after its future becomes ready. Keep GL calls on the thread that owns the context.</p>
+<p><code>executor.enqueue(function)</code> places ordinary CPU work on the same queue. Accepted jobs remain queued or running after their returned futures are released. <code>shutdown()</code> drains accepted jobs and joins workers. Executor destruction also joins. Call shutdown from an application thread at an explicit lifecycle point, and reserve that join time in the application budget.</p>
+<h2 id="plan-lifetimes-and-latency">Plan lifetimes and latency</h2>
+<p>GPU operations, completion queries and final release of GPU resource owners use
+the device's context thread. A <code>headless_device</code> retains its EGL context with
+the device state. An application-owned context must remain valid until all GPU
+objects are released. Stop CPU workers before destroying devices they can retain,
+and keep a dynamically loaded shader module loaded until its kernel snapshots
+and jobs finish.</p>
+<p>The CPU queue has a fixed pending capacity. Submission checks that capacity and reports a full queue as an error. Queue access uses short mutex-protected sections. Allocation, operating-system scheduling and driver calls have variable latency. Control GPU submissions with a finite resource ring and budget these costs separately from shader execution.</p>
+<p>See the <a href="api.html">API reference</a> for <code>submission</code>, <code>executor</code> and <code>pipeline</code>,
+and the <a href="portability.html">portability guide</a> for independent-invocation rules.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#enqueue-a-gpu-pipeline">Enqueue a GPU pipeline</a></li><li><a href="#use-a-finite-ring-of-resource-slots">Use a finite ring of resource slots</a></li><li><a href="#run-cpu-jobs-on-background-workers">Run CPU jobs on background workers</a></li><li><a href="#plan-lifetimes-and-latency">Plan lifetimes and latency</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

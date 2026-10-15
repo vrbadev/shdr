@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Transform and filter signals"><title>Transform and filter signals · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="transform-and-filter-signals">Transform and filter signals</h1>
+<p>The signal example runs batched FFTs, frequency-domain filters, FIR filters and
+streaming biquads on the CPU or GPU. Every stage uses the same native compute
+source on both backends. The helpers allocate working buffers and keep the
+stages in order.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_signal
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_signal<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<h2 id="choose-the-operation">Choose the operation</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Operation</th>
+<th scope="col">Input</th>
+<th scope="col">What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fft1d</code></td>
+<td>Complex <code>vec2</code> blocks</td>
+<td>Forward or normalized inverse FFT</td>
+</tr>
+<tr>
+<td><code>fft_filter</code></td>
+<td>Complex <code>vec2</code> blocks</td>
+<td>FFT, frequency mask, inverse FFT</td>
+</tr>
+<tr>
+<td><code>signal_window_kernel</code></td>
+<td>Complex <code>vec2</code> blocks</td>
+<td>Rectangular, Hann, Hamming or Blackman window</td>
+</tr>
+<tr>
+<td><code>fir_pipeline</code></td>
+<td>Real <code>float</code> blocks</td>
+<td>Causal finite impulse-response filter</td>
+</tr>
+<tr>
+<td><code>biquad_pipeline</code></td>
+<td>Real <code>float</code> blocks</td>
+<td>Stateful second-order recursive filter</td>
+</tr>
+</tbody>
+</table></div>
+<p>Buffers use channel-major order. Store all samples of channel zero, then all
+samples of channel one, and so on. Sample <code>i</code> in channel <code>c</code> is at
+<code>c * count + i</code>. A complex value uses <code>.x</code> for its real part and <code>.y</code> for its
+imaginary part. Store a real FFT input as <code>vec2(value, 0)</code>.</p>
+<h2 id="run-a-forward-and-inverse-fft">Run a forward and inverse FFT</h2>
+<p><a href="source/examples/fft_support.hpp.html">fft_support.hpp</a> provides a radix-two FFT plan for a positive power-of-two length, including length one. Supply blocks of that exact size and add application-controlled padding when needed.</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/fft_support.hpp"</span><span class="tok-c1"> // Use the FFT plan and buffer types.</span>
+<span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">&lt;cmath&gt;</span><span class="tok-c1"> // Generate a known input tone.</span>
+
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">256</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Choose a power-of-two block size.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Store one real-valued channel.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">spectrum</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Hold its complex frequency bins.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">restored</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Hold inverse reconstruction.</span>
+<span class="tok-k">auto</span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">samples</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Fill host data before running the plan.</span>
+<span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">i</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Generate a tone exactly on FFT bin twenty.</span>
+<span class="tok-w">    </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">double</span><span class="tok-w"> </span><span class="tok-n">phase</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mf">6.283185307179586</span><span class="tok-w"> </span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-mf">20.0</span><span class="tok-w"> </span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Convert sample position to phase.</span>
+<span class="tok-w">    </span><span class="tok-n">samples</span><span class="tok-p">[</span><span class="tok-n">i</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-p">(</span><span class="tok-kt">float</span><span class="tok-p">(</span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">sin</span><span class="tok-p">(</span><span class="tok-n">phase</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">0.f</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Keep the imaginary input zero.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// The complete input block is now ready.</span>
+
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">fft1d</span><span class="tok-w"> </span><span class="tok-n">forward</span><span class="tok-p">(</span><span class="tok-n">input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">spectrum</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Plan an unscaled forward transform.</span>
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">fft1d</span><span class="tok-w"> </span><span class="tok-nf">inverse</span><span class="tok-p">(</span><span class="tok-n">spectrum</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">restored</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">1</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-nb">true</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Plan normalized inverse output.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-n">processing</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Collect the linked dispatches in execution order.</span>
+<span class="tok-n">forward</span><span class="tok-p">.</span><span class="tok-n">append_to</span><span class="tok-p">(</span><span class="tok-n">processing</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Produce the spectrum first.</span>
+<span class="tok-n">inverse</span><span class="tok-p">.</span><span class="tok-n">append_to</span><span class="tok-p">(</span><span class="tok-n">processing</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Reconstruct from that same buffer.</span>
+<span class="tok-n">processing</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use run(gpu) to execute the same stages on a headless device.</span>
+</code></pre>
+<p>Attach <code>fft_bit_reverse.cpp</code> and <code>fft_butterfly.cpp</code> from <code>examples/shaders</code> with <code>shdr_target_shaders</code>. Keep both plan objects alive while their appended stages run. <code>processing_pipeline()</code> returns a plan's pipeline. <code>append_to(pipeline)</code> connects its stages to a larger GPU-resident chain. Join existing sequences with <code>pipeline += another_pipeline</code> or <code>first_pipeline &gt;&gt; second_pipeline</code>.</p>
+<p>The forward transform uses the negative complex exponential with unit scale. The inverse uses the positive exponential and applies <code>1/count</code> once in its last stage. Forward followed by inverse reconstructs the input within float precision. Bins use ordinary unshifted order. Bin zero is DC, and bin <code>count/2</code> is Nyquist for an even length.</p>
+<p>A plan has a bit-reversal dispatch followed by <code>log2(count)</code> butterfly stages. Working buffers give each stage separate read and write storage, allowing input and final output to alias. Twiddle phases are calculated once on the host and reused. Work per channel is <code>O(count * log(count))</code>, using independent invocations within each ordered dispatch.</p>
+<p>Use the fourth constructor argument for several channels. Allocate at least
+<code>count * channels</code> complex values in each bound buffer. Plans have fixed
+dimensions, so create another plan when those dimensions change.</p>
+<h2 id="apply-a-low-pass-high-pass-or-band-filter">Apply a low-pass, high-pass or band filter</h2>
+<p><code>fft_filter</code> links the forward transform, a real gain for each bin and the inverse
+transform. Add <code>signal_frequency_mask.cpp</code> to the FFT shader sources.</p>
+<pre><code class="language-cpp"><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">float</span><span class="tok-w"> </span><span class="tok-n">rate</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mf">1000.f</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Samples arrive one millisecond apart.</span>
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">fft_filter</span><span class="tok-w"> </span><span class="tok-nf">band</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Build one complete frequency-domain chain.</span>
+<span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">restored</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">1</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">rate</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Use the previously allocated single-channel blocks.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">frequency_filter</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">band_pass</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Keep a selected frequency band.</span>
+<span class="tok-w"> </span><span class="tok-mf">80.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">180.f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">20.f</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set lower edge, upper edge and transition width in hertz.</span>
+<span class="tok-n">band</span><span class="tok-p">.</span><span class="tok-n">processing_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use run(gpu) to execute the same bindings on the GPU.</span>
+</code></pre>
+<p>The modes are <code>low_pass</code>, <code>high_pass</code>, <code>band_pass</code> and <code>band_stop</code>. Low-pass and
+high-pass use the first cutoff. Band modes also use the second cutoff, which
+must be larger. Rates must be positive and finite. Cutoffs lie strictly between
+zero and half the sample rate.</p>
+<p>The mask folds bins onto frequency magnitude: <code>frequency = min(bin, count-bin) * rate / count</code>. Equal gain at positive and negative frequencies preserves conjugate symmetry for real inputs. Bins remain in unshifted order.</p>
+<p>With zero transition width, low-pass includes its cutoff bin, high-pass excludes
+it, and band-pass keeps <code>lower &lt; frequency &lt;= upper</code>. Band-stop uses the
+complement. A positive width centers a raised-cosine transition on each cutoff.
+Half the transition lies below the cutoff and half above it. The gain at a
+single cutoff is one half. Overlapping transitions can reduce the gain inside
+a narrow band.</p>
+<p><code>spectrum()</code> exposes the forward result, and <code>filtered_spectrum()</code> exposes the
+masked result as const buffer references. Bind them directly to another GPU
+stage to avoid a download. Calling <code>data()</code> reads them on the host and can wait.</p>
+<p>This is <strong>circular block filtering</strong>: the FFT treats each block as periodic. For linear streaming convolution, provide padding and an application-controlled overlap method. The application owns overlap history and joins the filtered block edges.</p>
+<h2 id="window-a-block-before-spectral-analysis">Window a block before spectral analysis</h2>
+<p>The optional <code>signal_window_kernel</code> has <code>input_values</code> and <code>output_values</code>
+complex buffer ports, with <code>block_length</code>, <code>channels</code> and <code>mode</code> unsigned uniforms.
+Mode zero is rectangular, one is Hann, two is Hamming and three is Blackman.
+Attach <code>signal_window.cpp</code> when using it.</p>
+<p>The windows are symmetric over <code>length-1</code> intervals, with unit gain at length one. The same gain multiplies both complex components. Windowing reduces edge discontinuities and changes amplitude. An inverse FFT reconstructs the windowed input. Apply amplitude calibration appropriate to the chosen window and analysis.</p>
+<h2 id="design-and-run-a-fir-filter">Design and run a FIR filter</h2>
+<p><a href="source/examples/signal_filters.hpp.html">signal_filters.hpp</a> provides
+<code>filter_mode::low_pass</code>, <code>high_pass</code>, <code>band_pass</code>, <code>band_stop</code> and
+<code>moving_average</code> for coefficient design. Attach <code>signal_fir.cpp</code> to the target.</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/signal_filters.hpp"</span><span class="tok-c1"> // Use the FIR and biquad helpers.</span>
+
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">samples_per_channel</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">1024</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set the batch length.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">real_input</span><span class="tok-p">(</span><span class="tok-n">samples_per_channel</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Fill this buffer with real signal samples.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">filtered</span><span class="tok-p">(</span><span class="tok-n">samples_per_channel</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Keep output separate from input.</span>
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">fir_pipeline</span><span class="tok-w"> </span><span class="tok-nf">low_pass</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Design and bind one causal FIR filter.</span>
+<span class="tok-w">    </span><span class="tok-n">real_input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">filtered</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">samples_per_channel</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">1</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Process one channel.</span>
+<span class="tok-w">    </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">filter_mode</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">low_pass</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Select a low-pass response.</span>
+<span class="tok-w">    </span><span class="tok-mf">1000.0</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">100.0</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">0.0</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">65</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use 1000 Hz sampling, 100 Hz cutoff and 65 taps.</span>
+<span class="tok-n">low_pass</span><span class="tok-p">.</span><span class="tok-n">processing_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Or run(gpu) for the same filtering operation.</span>
+</code></pre>
+<p><code>fir_coefficients(mode, rate, cutoff1, cutoff2, taps)</code> returns a coefficient array. The designer uses a Hamming-windowed sinc with an odd tap count from 3 to 4095. Cutoff units match the sample rate, normally hertz. Band edges increase and stay below Nyquist. Moving-average mode returns equal weights for the requested tap count.</p>
+<p>Low-pass, moving-average and band-stop designs have unit DC gain. High-pass has
+unit Nyquist gain, and band-pass has unit gain at its band midpoint. The designed
+filters are linear-phase with group delay <code>(taps-1)/2</code> samples. More taps cost
+more work and generally provide a narrower transition.</p>
+<p>Each output is the causal sum <code>sum(coefficients[k] * input[n-k])</code>, with zero-valued samples before the batch start. Each independent batch produces exactly the input sample count. Supply preceding samples and any desired convolution-tail padding explicitly when processing stream chunks, or choose the stateful biquad helper.</p>
+<p>A custom coefficient vector may have any length from 1 to 4095 and must contain
+finite values. <code>fir_pipeline</code> copies it into its public <code>coefficients</code> buffer.
+Editing that buffer preserves the original tap count. <code>bind(input, output, count)</code> changes the batch resources while retaining the channel count and
+coefficients. Input and output must use distinct storage.</p>
+<h2 id="keep-biquad-state-across-stream-chunks">Keep biquad state across stream chunks</h2>
+<p>The biquad designer supports low-pass, high-pass, band-pass and band-stop.
+Band-stop is a notch response. These coefficients follow the
+<a href="https://www.w3.org/TR/audio-eq-cookbook/">W3C Audio EQ Cookbook</a>, based on Robert
+Bristow-Johnson's formulas.</p>
+<pre><code class="language-cpp"><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">biquad_pipeline</span><span class="tok-w"> </span><span class="tok-nf">stream_filter</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Allocate zero-initialized channel state.</span>
+<span class="tok-w">    </span><span class="tok-n">real_input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">filtered</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">samples_per_channel</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">1</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Bind the first single-channel block.</span>
+<span class="tok-w">    </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">filter_mode</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">low_pass</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Choose the recursive response.</span>
+<span class="tok-w">    </span><span class="tok-mf">1000.0</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">100.0</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use a 100 Hz cutoff at 1000 Hz sampling.</span>
+<span class="tok-n">stream_filter</span><span class="tok-p">.</span><span class="tok-n">processing_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Process the first block on the CPU.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">next_input</span><span class="tok-p">(</span><span class="tok-n">samples_per_channel</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Fill this with the next block of samples.</span>
+<span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">next_output</span><span class="tok-p">(</span><span class="tok-n">samples_per_channel</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Reserve the next block's results.</span>
+<span class="tok-n">stream_filter</span><span class="tok-p">.</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-n">next_input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">next_output</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">samples_per_channel</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Preserve history while replacing the buffers.</span>
+<span class="tok-n">stream_filter</span><span class="tok-p">.</span><span class="tok-n">processing_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Continue with the retained state.</span>
+</code></pre>
+<p><code>biquad_coefficients(mode, rate, frequency, Q)</code> returns five floats in the order
+<code>b0, b1, b2, a1, a2</code>, with <code>a0</code> normalized to one. The frequency is a cutoff for
+low-pass and high-pass, or a center for band-pass and notch. It lies strictly
+inside Nyquist. <code>Q</code> must be positive and finite. The default is approximately
+0.7071. Band-pass has unit center-frequency gain. The designer rejects feedback
+coefficients that lose strict stability after conversion to float.</p>
+<p>Each channel stores one <code>vec2(z1, z2)</code> in the public <code>state</code> buffer. The shader
+uses transposed direct-form II. It processes samples sequentially within a
+channel and processes independent channels in parallel. State survives later
+<code>bind</code> calls and CPU/GPU transitions. Separate streams need separate state.</p>
+<p><code>reset_state()</code> discards the old history and clears the host state. It avoids
+downloading old GPU history. The next GPU dispatch uploads the cleared state.
+The public <code>coefficients</code> buffer can be edited, but new feedback values must
+still describe a stable filter.</p>
+<h2 id="validate-and-link-stages">Validate and link stages</h2>
+<p>The signal example compares FFT results with an independent double-precision
+DFT, checks inverse reconstruction, and tests impulses, tones and seeded random
+inputs. Filter checks cover all modes, coefficient gains, double-precision
+convolution or recurrence references, multiple channels, explicit resets and
+variable stream chunks, including CPU/GPU transitions.</p>
+<p>Keep helper objects alive while their pipeline references are used. Prepare GPU
+pipelines before a processing loop, and use separate writable resources for
+concurrent jobs. The <a href="async.html">asynchronous guide</a> explains ring slots and
+completion polling. The earlier <a href="imaging.html">spectral example</a> uses a direct
+two-dimensional DFT for small images. The FFT helper here handles batched
+one-dimensional signals.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#choose-the-operation">Choose the operation</a></li><li><a href="#run-a-forward-and-inverse-fft">Run a forward and inverse FFT</a></li><li><a href="#apply-a-low-pass-high-pass-or-band-filter">Apply a low-pass, high-pass or band filter</a></li><li><a href="#window-a-block-before-spectral-analysis">Window a block before spectral analysis</a></li><li><a href="#design-and-run-a-fir-filter">Design and run a FIR filter</a></li><li><a href="#keep-biquad-state-across-stream-chunks">Keep biquad state across stream chunks</a></li><li><a href="#validate-and-link-stages">Validate and link stages</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

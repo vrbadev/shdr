@@ -1,0 +1,142 @@
+/* Shared presentation for the shdr guides, examples and reference pages. */
+:root {
+  color-scheme: light dark;
+  --bg: #fafbf8;
+  --surface: #ffffff;
+  --fg: #1c2d29;
+  --muted: #52635c;
+  --border: #d8e1da;
+  --accent: #09654b;
+  --accent-soft: #e6f2eb;
+  --code: #edf2ee;
+  --focus: #a14505;
+}
+/* Respect the reader's chosen appearance without hiding the content. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111c19;
+    --surface: #182622;
+    --fg: #e4eee8;
+    --muted: #aabeb2;
+    --border: #354a40;
+    --accent: #80d9b4;
+    --accent-soft: #203d31;
+    --code: #1b2d25;
+    --focus: #ffc488;
+  }
+}
+/* Give layouts predictable dimensions and keep anchored headings visible. */
+* { box-sizing: border-box; }
+html { scroll-padding-top: 1.5rem; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 1rem/1.7 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-underline-offset: .18em; overflow-wrap: anywhere; }
+a:hover { text-decoration-thickness: .14em; }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+button, input, select { font: inherit; }
+button, summary { cursor: pointer; }
+img, svg { max-width: 100%; height: auto; }
+/* A visible keyboard shortcut skips repeated navigation. */
+.skip-link { position: absolute; top: -5rem; left: 1rem; z-index: 10; padding: .7rem 1rem; color: var(--fg); background: var(--surface); border: 2px solid var(--accent); }
+.skip-link:focus { top: .5rem; }
+.site-header { border-bottom: 1px solid var(--border); background: var(--surface); }
+.header-inner { max-width: 1240px; margin: auto; padding: 1rem 2rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem 2rem; }
+.brand { color: var(--fg); text-decoration: none; font-size: 1.5rem; font-weight: 800; letter-spacing: -.05em; }
+.brand span { margin-left: .6rem; color: var(--muted); font-size: .8rem; font-weight: 450; letter-spacing: 0; }
+.brand .release-version { color: var(--accent); font-size: .85rem; font-weight: 700; }
+.site-nav { display: flex; flex-wrap: wrap; gap: .25rem .4rem; margin: 0; }
+.site-nav a { padding: .35rem .65rem; text-decoration: none; border-radius: .35rem; font-size: .92rem; font-weight: 600; }
+.site-nav a[aria-current="page"], .site-nav a:hover { color: var(--fg); background: var(--accent-soft); }
+/* Guides keep a readable line length while tables can use the wider shell. */
+.page-shell { max-width: 1240px; margin: auto; padding: 3rem 2rem 5rem; }
+main.page-main { max-width: 1050px; margin: 0 auto; padding: 0; min-width: 0; }
+.guide-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 3.5rem; }
+.guide-layout .page-main { width: 100%; }
+.page-main > p, .page-main > ul, .page-main > ol { max-width: 78ch; }
+h1, h2, h3, h4 { line-height: 1.22; letter-spacing: -.025em; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.5rem); margin: 0 0 1.2rem; }
+h2 { font-size: 1.75rem; margin: 3rem 0 1rem; }
+h3 { font-size: 1.2rem; margin: 2rem 0 .7rem; }
+h4 { font-size: 1.05rem; }
+p { margin: 1rem 0; }
+li { margin: .4rem 0; }
+li > p { margin: .4rem 0; }
+strong { font-weight: 700; }
+.eyebrow { color: var(--accent); font-size: .8rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; margin: 0 0 .8rem; }
+.lead { color: var(--muted); font-size: 1.2rem; line-height: 1.65; max-width: 65ch; }
+.muted, .metadata, figcaption { color: var(--muted); font-size: .9rem; }
+.callout, blockquote { margin: 1.5rem 0; padding: .5rem 1.3rem; border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 .5rem .5rem 0; }
+.callout p:first-child, blockquote p:first-child { margin-top: .5rem; }
+.callout p:last-child, blockquote p:last-child { margin-bottom: .5rem; }
+.toc { font-size: .9rem; align-self: start; position: sticky; top: 1.5rem; padding-left: 1.2rem; border-left: 1px solid var(--border); }
+.toc p { font-weight: 700; margin: 0 0 .6rem; }
+.toc ul { padding: 0; list-style: none; }
+.toc li { margin: .55rem 0; line-height: 1.4; }
+.toc a { text-decoration: none; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: .7rem; padding: 1.25rem; }
+.card h2, .card h3 { margin: 0 0 .6rem; font-size: 1.15rem; }
+.card p { margin: .5rem 0; }
+.button-link { display: inline-block; border: 1px solid var(--accent); border-radius: .4rem; padding: .55rem 1rem; font-weight: 650; text-decoration: none; }
+.button-link.primary { background: var(--accent); color: var(--bg); }
+.actions { display: flex; flex-wrap: wrap; gap: .7rem; margin: 1.5rem 0; }
+/* Code stays exact and scrolls horizontally rather than forcing a narrow page wider. */
+code, kbd { font: .9em/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+:not(pre) > code { background: var(--code); padding: .12rem .3rem; border-radius: .25rem; overflow-wrap: anywhere; }
+pre { max-width: 100%; overflow: auto; background: var(--code); border: 1px solid var(--border); border-radius: .5rem; padding: 1.15rem; font-size: .86rem; line-height: 1.65; tab-size: 4; }
+pre code { font-size: inherit; white-space: pre; }
+.code-caption { margin: 1.5rem 0 -.3rem; font-size: .86rem; font-weight: 650; color: var(--muted); }
+.table-wrap { max-width: 100%; overflow: auto; margin: 1.5rem 0; border: 1px solid var(--border); border-radius: .5rem; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; font-variant-numeric: tabular-nums; }
+th, td { padding: .75rem .85rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+th { background: var(--accent-soft); font-weight: 700; }
+tbody tr:last-child td { border-bottom: 0; }
+caption { text-align: left; font-weight: 650; padding: .75rem; }
+details { margin: 1rem 0; padding: .7rem 1rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); }
+summary { font-weight: 650; }
+details[open] > summary { margin-bottom: .8rem; }
+label { display: block; font-weight: 650; margin: 1rem 0 .35rem; }
+input[type="search"] { width: 100%; border: 1px solid var(--border); border-radius: .4rem; padding: .7rem .85rem; color: var(--fg); background: var(--surface); }
+.hidden, [hidden] { display: none !important; }
+.entry { border-top: 1px solid var(--border); margin-top: 1rem; padding: .5rem 0 1rem; }
+.entry p { margin: .7rem 0; }
+.section-nav { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 1.5rem 0; }
+.source { font-size: .85rem; }
+.source-view { max-width: none; }
+.source-view pre { padding: 1rem 0; }
+.source-code code { white-space: pre; }
+.line { display: inline-block; min-width: 100%; min-height: 1.65em; padding-right: 1.5rem; }
+.line:target { background: var(--accent-soft); outline: 1px solid var(--accent); }
+.line-number { display: inline-block; width: 5.8em; margin-right: 1.2em; padding-right: .7em; text-align: right; color: var(--muted); border-right: 1px solid var(--border); text-decoration: none; user-select: none; }
+.file-list { columns: 2 21rem; padding-left: 1.3rem; }
+.file-list li { break-inside: avoid; }
+.footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem; color: var(--muted); font-size: .85rem; }
+.footer p { max-width: 1176px; margin: auto; }
+/* Stack the guide navigation beneath the article on a narrow screen. */
+@media (max-width: 900px) {
+  .guide-layout { display: flex; flex-direction: column-reverse; gap: 2rem; }
+  .toc { position: static; width: 100%; }
+  .toc ul { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: 0; }
+  .toc li { margin: 0; }
+}
+@media (max-width: 600px) {
+  .header-inner { padding: .9rem 1rem; }
+  .brand span { display: none; }
+  .brand .release-version { display: inline; }
+  .page-shell { padding: 2rem 1rem 3rem; }
+  .site-nav { gap: .1rem; }
+  .site-nav a { padding: .3rem .45rem; font-size: .85rem; }
+  th, td { padding: .6rem; }
+  pre { font-size: .8rem; }
+  .line-number { width: 4.5em; margin-right: .6em; }
+}
+/* Printed guides retain source and table content without navigation clutter. */
+@media print {
+  :root { color-scheme: light; --bg: white; --surface: white; --fg: black; --muted: #333; --border: #aaa; --accent: #064e3b; --accent-soft: #f2f2f2; --code: #f5f5f5; }
+  .site-header, .toc, .skip-link, .actions, .footer { display: none; }
+  .page-shell { padding: 0; }
+  .guide-layout { display: block; }
+  pre { white-space: pre-wrap; overflow: visible; }
+  pre code { white-space: pre-wrap; }
+  .table-wrap { overflow: visible; }
+  h2, h3, summary { break-after: avoid; }
+}

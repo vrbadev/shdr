@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Choose and read complete CPU and GPU pipeline examples, including imaging, signals, events and neural models."><title>Examples and native shaders · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html" aria-current="page">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Examples</p><h1 id="learn-from-a-complete-pipeline">Learn from a complete pipeline</h1>
+<p>Each example builds a host application with embedded native GLSL shaders. Its default execution path uses the CPU. Select a supported headless GPU profile to run the same pipeline on a GPU. Start with the buffer pipeline, then choose an operation close to your application.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Build the examples and their embedded shaders in Release mode.</span>
+cmake<span class="tok-w"> </span>-S<span class="tok-w"> </span>.<span class="tok-w"> </span>-B<span class="tok-w"> </span>build<span class="tok-w"> </span>-DCMAKE_BUILD_TYPE<span class="tok-o">=</span>Release
+<span class="tok-c1"># Compile the configured applications and CPU adapters.</span>
+cmake<span class="tok-w"> </span>--build<span class="tok-w"> </span>build<span class="tok-w"> </span>-j
+<span class="tok-c1"># Run three linked stages on the CPU.</span>
+./build/example_pipeline
+<span class="tok-c1"># Run the same application and shaders on an ES 3.1 GPU.</span>
+./build/example_pipeline<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<p>Supported profile arguments are <code>es31</code>, <code>es32</code>, <code>gl43</code>, <code>gl45</code> and <code>gl46</code>. The driver supplies the requested GPU context. CPU examples use host resources. Each excerpt links to complete numbered source files.</p>
+<div class="callout"><p><strong>Connect the complete pipeline.</strong> Keep each kernel alive while a stage refers to it. Read completed resources through a const reference. Use distinct writable resources for concurrent jobs and separate input and output storage for neighborhood filters.</p></div>
+<h2 id="buffers-and-execution">Buffers and execution</h2>
+<h3 id="example-pipeline-transform-clamp-and-reduce-a-buffer"><code>example_pipeline</code> · Transform, clamp and reduce a buffer</h3>
+<p>Three linked kernels apply an affine transform, clamp its output and compute block sums. This is the shortest complete example of named bindings and shared intermediate storage.</p>
+<p><a href="source/examples/pipeline.cpp.html">Read the host program</a> · <a href="resources.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/affine.cpp.html">affine_kernel</a>, <a href="source/examples/shaders/clamp.cpp.html">clamp_kernel</a>, <a href="source/examples/shaders/sum.cpp.html">sum_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp">
+<span class="tok-w"> </span><span class="tok-c1">// Resources are linked by binding the same object to adjacent shader ports.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-n">affine</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">63</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">64</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Start with enough 64-wide groups to cover all original inputs.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-n">clip</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">31</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">32</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Run the linked clip shader with its own 32-wide workgroup size.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-n">sum</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-mi">1</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Finish with one deterministic reduction invocation over the clipped resource.</span>
+<span class="tok-w"> </span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">pipeline</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Execute the configured pipeline on the requested backend.</span>
+<span class="tok-w"> </span><span class="tok-kt">float</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mf">0.0f</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Start the independent host reference sum at zero.</span>
+<span class="tok-w"> </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">read_input</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use a constant buffer view so GPU writes synchronize before host reads.</span>
+<span class="tok-w"> </span><span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">i</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Apply the same scale, offset and clipping formula to every original input.</span>
+<span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">min</span><span class="tok-p">(</span><span class="tok-mf">8.0f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">max</span><span class="tok-p">(</span><span class="tok-mf">0.0f</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">read_input</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">[</span><span class="tok-n">i</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-mf">2.0f</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mf">1.0f</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Accumulate the independent reference from the original inputs.</span>
+<span class="tok-w"> </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">read_result</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">result</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use a constant buffer view so GPU writes synchronize before host reads.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">require_close</span><span class="tok-p">(</span><span class="tok-n">read_result</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">[</span><span class="tok-mi">0</span><span class="tok-p">]</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">pipeline sum</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Check the computed value against the independent reference.</span>
+<span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">cout</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">gpu</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">?</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">GPU</span><span class="tok-s">"</span><span class="tok-w"> </span><span class="tok-o">:</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">CPU</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s"> buffer pipeline: </span><span class="tok-s">"</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-n">read_result</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">[</span><span class="tok-mi">0</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-c1">// Write this part of the example result or diagnostic.</span>
+<span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-se">\n</span><span class="tok-s">"</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Write this part of the example result or diagnostic.</span>
+</code></pre>
+</details>
+<h3 id="example-hybrid-choose-a-backend-for-each-stage"><code>example_hybrid</code> · Choose a backend for each stage</h3>
+<p>Run an explicit CPU clamp between GPU stages. The same buffers carry data across each backend boundary and the runtime synchronizes the required storage.</p>
+<p><a href="source/examples/hybrid.cpp.html">Read the host program</a> · <a href="resources.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/affine.cpp.html">affine_kernel</a>, <a href="source/examples/shaders/clamp.cpp.html">clamp_kernel</a>, <a href="source/examples/shaders/sum.cpp.html">sum_kernel</a>.</p>
+<h3 id="example-images-connect-buffers-and-image-storage"><code>example_images</code> · Connect buffers and image storage</h3>
+<p>Move a scalar buffer into an image, apply a neighborhood blur, then move the image result back into a buffer.</p>
+<p><a href="source/examples/images.cpp.html">Read the host program</a> · <a href="imaging.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/buffer_to_image.cpp.html">buffer_to_image_kernel</a>, <a href="source/examples/shaders/blur.cpp.html">blur_kernel</a>, <a href="source/examples/shaders/image_to_buffer.cpp.html">image_to_buffer_kernel</a>.</p>
+<h3 id="example-async-keep-several-jobs-in-flight"><code>example_async</code> · Keep several jobs in flight</h3>
+<p>Use a bounded CPU executor or a three-slot GPU submission ring. Poll completion and reuse each slot only after its earlier job completes.</p>
+<p><a href="source/examples/async.cpp.html">Read the host program</a> · <a href="async.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/affine.cpp.html">affine_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp"><span class="tok-w">    </span><span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">shader</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">make_kernel</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">affine_kernel</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create the linked affine kernel instance.</span>
+<span class="tok-w">    </span><span class="tok-n">shader</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">set</span><span class="tok-o">&lt;</span><span class="tok-kt">unsigned</span><span class="tok-o">&gt;</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">count</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">element_count</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Supply this shader uniform with its typed application value.</span>
+<span class="tok-w">    </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-p">(</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">shader</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">element_count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">63</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">64</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Add a shader dispatch with the required workgroup counts.</span>
+<span class="tok-w">    </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">unique_ptr</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">executor</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">workers</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Declare workers for the following calculation.</span>
+<span class="tok-w">    </span><span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-o">!</span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">gpu</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Check this condition before entering the following branch.</span>
+<span class="tok-w">        </span><span class="tok-n">workers</span><span class="tok-p">.</span><span class="tok-n">reset</span><span class="tok-p">(</span><span class="tok-k">new</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">executor</span><span class="tok-p">(</span><span class="tok-mi">2</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">slot_count</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply reset to these arguments.</span>
+<span class="tok-w">    </span><span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">gpu</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Check this condition before entering the following branch.</span>
+<span class="tok-w">        </span><span class="tok-c1">// Initial program compilation and every slot's allocation/upload happen</span>
+<span class="tok-w">        </span><span class="tok-c1">// before entering the polling loop.</span>
+<span class="tok-w">        </span><span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">index</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">index</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-n">slot_count</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">index</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Iterate over index for this calculation.</span>
+<span class="tok-w">            </span><span class="tok-n">shader</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">input_values</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">slots</span><span class="tok-p">[</span><span class="tok-n">index</span><span class="tok-p">]</span><span class="tok-p">.</span><span class="tok-n">input</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Connect this shader port to its application resource.</span>
+<span class="tok-w">                </span><span class="tok-p">.</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">output_values</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">slots</span><span class="tok-p">[</span><span class="tok-n">index</span><span class="tok-p">]</span><span class="tok-p">.</span><span class="tok-n">output</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Connect this shader port to its application resource.</span>
+<span class="tok-w">            </span><span class="tok-n">pipeline</span><span class="tok-p">.</span><span class="tok-n">prepare</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">device</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply prepare to these arguments.</span>
+<span class="tok-w">        </span><span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// End this block.</span>
+<span class="tok-w">    </span><span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// End this block.</span>
+</code></pre>
+</details>
+<h3 id="example-dynamic-load-a-shader-stage-from-a-module"><code>example_dynamic</code> · Load a shader stage from a module</h3>
+<p>Create the affine stage through a dynamically loaded plugin and connect it to host-owned clamp and reduction stages. Keep the module loaded until its kernels are destroyed.</p>
+<p><a href="source/examples/dynamic.cpp.html">Read the host program</a> · <a href="source/examples/plugin.cpp.html">Read the plugin</a> · <a href="resources.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/affine.cpp.html">affine_kernel</a>, <a href="source/examples/shaders/clamp.cpp.html">clamp_kernel</a>, <a href="source/examples/shaders/sum.cpp.html">sum_kernel</a>.</p>
+<h2 id="imaging-and-spectral-processing">Imaging and spectral processing</h2>
+<h3 id="example-imaging-unpack-bayer-data-and-compress-integer-streams"><code>example_imaging</code> · Unpack Bayer data and compress integer streams</h3>
+<p>Check four Bayer phases across Bayer8, Bayer16, MIPI RAW10 and RAW12 packing, followed by bilinear demosaicing and luminance. A second pipeline counts, offsets, encodes and decodes tiled lossless runs.</p>
+<p><a href="source/examples/imaging.cpp.html">Read the host program</a> · <a href="imaging.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/bayer_unpack.cpp.html">bayer_unpack_kernel</a>, <a href="source/examples/shaders/debayer.cpp.html">debayer_kernel</a>, <a href="source/examples/shaders/luminance.cpp.html">luminance_kernel</a>, <a href="source/examples/shaders/rle_count.cpp.html">rle_count_kernel</a>, <a href="source/examples/shaders/rle_offsets.cpp.html">rle_offsets_kernel</a>, <a href="source/examples/shaders/rle_encode.cpp.html">rle_encode_kernel</a>, <a href="source/examples/shaders/rle_decode.cpp.html">rle_decode_kernel</a>.</p>
+<h3 id="example-vision-find-corners-after-smoothing"><code>example_vision</code> · Find corners after smoothing</h3>
+<p>Run horizontal and vertical Gaussian filters, Sobel gradients, the structure tensor, Harris response and nonmaximum suppression. Independent numerical references check each processing stage and the resulting corner mask.</p>
+<p><a href="source/examples/vision.cpp.html">Read the host program</a> · <a href="imaging.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/gaussian_horizontal.cpp.html">gaussian_horizontal_kernel</a>, <a href="source/examples/shaders/gaussian_vertical.cpp.html">gaussian_vertical_kernel</a>, <a href="source/examples/shaders/sobel.cpp.html">sobel_kernel</a>, <a href="source/examples/shaders/harris_tensor.cpp.html">harris_tensor_kernel</a>, <a href="source/examples/shaders/harris_response.cpp.html">harris_response_kernel</a>, <a href="source/examples/shaders/nonmax.cpp.html">nonmax_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp">
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">63</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">64</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Construct groups with these initial values.</span>
+<span class="tok-w">        </span><span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">gaussian_x</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Add a shader dispatch with the required workgroup counts.</span>
+<span class="tok-w">                        </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">gaussian_y</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">sobel</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Add a shader dispatch with the required workgroup counts.</span>
+<span class="tok-w">                        </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">tensor</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">harris</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Add a shader dispatch with the required workgroup counts.</span>
+<span class="tok-w">                        </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">nonmax</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">groups</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Add a shader dispatch with the required workgroup counts.</span>
+<span class="tok-w">        </span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">pipeline</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Execute the configured pipeline on the requested backend.</span>
+
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">expected_blur</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">gaussian_reference</span><span class="tok-p">(</span><span class="tok-n">input</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">width</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">height</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set expected blur from this expression.</span>
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">expected_gradients</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-c1">// Set expected gradients from this expression.</span>
+<span class="tok-w">            </span><span class="tok-n">gradient_reference</span><span class="tok-p">(</span><span class="tok-n">expected_blur</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">width</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">height</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply gradient reference to these arguments.</span>
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">expected_response</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-c1">// Set expected response from this expression.</span>
+<span class="tok-w">            </span><span class="tok-n">harris_reference</span><span class="tok-p">(</span><span class="tok-n">expected_gradients</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">width</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">height</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">harris_k</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply harris reference to these arguments.</span>
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">read_blur</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">blurred</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use a constant buffer view so GPU writes synchronize before host reads.</span>
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec2</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">read_gradients</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">gradients</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use a constant buffer view so GPU writes synchronize before host reads.</span>
+</code></pre>
+</details>
+<h3 id="example-spectral-link-convolution-and-a-complex-2d-transform"><code>example_spectral</code> · Link convolution and a complex 2D transform</h3>
+<p>Apply dynamic 2D filters, perform a separable forward and inverse direct DFT, and filter a 3D volume along three axes. The small direct transform is educational and is separate from the faster radix-2 signal FFT.</p>
+<p><a href="source/examples/spectral.cpp.html">Read the host program</a> · <a href="imaging.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/convolution2d.cpp.html">convolution2d_kernel</a>, <a href="source/examples/shaders/convolution3d.cpp.html">convolution3d_kernel</a>, <a href="source/examples/shaders/dft_rows.cpp.html">dft_rows_kernel</a>, <a href="source/examples/shaders/dft_columns.cpp.html">dft_columns_kernel</a>.</p>
+<h3 id="example-signal-transform-and-filter-channel-major-signals"><code>example_signal</code> · Transform and filter channel-major signals</h3>
+<p>Use batched forward and inverse radix-2 FFTs, windows and frequency masks. Compare causal FIR modes and persistent biquad streams against independent references.</p>
+<p><a href="source/examples/signal.cpp.html">Read the host program</a> · <a href="signals.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/fft_bit_reverse.cpp.html">fft_bit_reverse_kernel</a>, <a href="source/examples/shaders/fft_butterfly.cpp.html">fft_butterfly_kernel</a>, <a href="source/examples/shaders/signal_window.cpp.html">signal_window_kernel</a>, <a href="source/examples/shaders/signal_frequency_mask.cpp.html">signal_frequency_mask_kernel</a>, <a href="source/examples/shaders/signal_fir.cpp.html">signal_fir_kernel</a>, <a href="source/examples/shaders/signal_biquad.cpp.html">signal_biquad_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"fft_checks.hpp"</span><span class="tok-c1"> // Check FFT, spectral masks, and input windows.</span>
+<span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"signal_filters_checks.hpp"</span><span class="tok-c1"> // Check causal FIR and streaming biquad filters.</span>
+<span class="tok-kt">int</span><span class="tok-w"> </span><span class="tok-nf">main</span><span class="tok-p">(</span><span class="tok-kt">int</span><span class="tok-w"> </span><span class="tok-n">argc</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-kt">char</span><span class="tok-o">*</span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">argv</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Run every signal example with the same selected backend.</span>
+<span class="tok-w"> </span><span class="tok-k">try</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Report dimension or numerical errors as a failed example.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">runner</span><span class="tok-w"> </span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">argc</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">argv</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Use CPU by default or the requested GPU profile.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">check_fft1d</span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Validate the forward and inverse complex transforms.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">check_frequency_filters</span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Validate all frequency-domain filter modes.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">check_signal_windows</span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Validate windowed spectral analysis.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">check_signal_filters</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Validate FIR responses and persistent biquad state.</span>
+<span class="tok-w"> </span><span class="tok-n">run</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Validate FIR responses and persistent biquad state.</span>
+<span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">cout</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">gpu</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">?</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">GPU</span><span class="tok-s">"</span><span class="tok-w"> </span><span class="tok-o">:</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">CPU</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Report the completed real-data processing check.</span>
+<span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s"> signal pipelines passed</span><span class="tok-se">\n</span><span class="tok-s">"</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Show which backend completed the checks.</span>
+<span class="tok-w"> </span><span class="tok-k">return</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// All processing and reference comparisons succeeded.</span>
+<span class="tok-cp">#</span><span class="tok-cp">ifdef SHDR_HAVE_EGL </span><span class="tok-c1">// The optional EGL backend can identify unavailable contexts.</span>
+<span class="tok-w"> </span><span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-k">catch</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">context_unavailable</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-c1">// Select the profiles supplied by the driver.</span>
+</code></pre>
+</details>
+<h2 id="events-and-neural-models">Events and neural models</h2>
+<h3 id="example-evt3-decode-events-and-estimate-normal-flow"><code>example_evt3</code> · Decode events and estimate normal flow</h3>
+<p>Preserve EVT3 stream order through block summaries, state seeding, compact offsets and direct output. Append an event-centered timestamp-plane fit while keeping decoded events and their count on the selected backend.</p>
+<p><a href="source/examples/evt3.cpp.html">Read the host program</a> · <a href="evt3.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/evt3_summary.cpp.html">evt3_summary_kernel</a>, <a href="source/examples/shaders/evt3_seed.cpp.html">evt3_seed_kernel</a>, <a href="source/examples/shaders/rle_offsets.cpp.html">rle_offsets_kernel</a>, <a href="source/examples/shaders/evt3_emit.cpp.html">evt3_emit_kernel</a>, <a href="source/examples/shaders/evt3_reset.cpp.html">evt3_reset_kernel</a>, <a href="source/examples/shaders/evt3_flow.cpp.html">evt3_flow_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp"><span class="tok-w">        </span><span class="tok-n">reference_decoder</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Declare reference for the following calculation.</span>
+<span class="tok-w">        </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-n">uvec4</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">.</span><span class="tok-n">decode</span><span class="tok-p">(</span><span class="tok-n">words</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set expected from this expression.</span>
+<span class="tok-w">        </span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">reset_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Execute the configured pipeline on the requested backend.</span>
+<span class="tok-w">        </span><span class="tok-n">compare</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply compare to these arguments.</span>
+<span class="tok-w">        </span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">reset_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Execute the configured pipeline on the requested backend.</span>
+<span class="tok-w">        </span><span class="tok-n">compare</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply compare to these arguments.</span>
+<span class="tok-w">    </span><span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// End this block.</span>
+<span class="tok-w">    </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">evt3_decoder</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">(</span><span class="tok-mi">6013</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Construct decoder with these initial values.</span>
+<span class="tok-w">    </span><span class="tok-n">words</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">evt3_random_words</span><span class="tok-p">(</span><span class="tok-mi">6013</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">897</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set words from this expression.</span>
+<span class="tok-w">    </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">load</span><span class="tok-p">(</span><span class="tok-n">words</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply load to these arguments.</span>
+<span class="tok-w">    </span><span class="tok-n">reference_decoder</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Declare reference for the following calculation.</span>
+<span class="tok-w">    </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-n">uvec4</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">.</span><span class="tok-n">decode</span><span class="tok-p">(</span><span class="tok-n">words</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Set expected from this expression.</span>
+<span class="tok-w">    </span><span class="tok-n">runner</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">reset_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Execute the configured pipeline on the requested backend.</span>
+<span class="tok-w">    </span><span class="tok-n">compare</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">expected</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">reference</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Apply compare to these arguments.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// End this block.</span>
+</code></pre>
+</details>
+<h3 id="example-neural-train-a-small-fully-connected-network"><code>example_neural</code> · Train a small fully connected network</h3>
+<p>Train all 33 parameters of a two-feature, eight-neuron ReLU network with a sigmoid classifier. Analytic gradients and SGD updates run in the native shader pipeline.</p>
+<p><a href="source/examples/neural.cpp.html">Read the host program</a> · <a href="neural.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/ann_infer.cpp.html">ann_infer_kernel</a>, <a href="source/examples/shaders/ann_gradient.cpp.html">ann_gradient_kernel</a>, <a href="source/examples/shaders/nn_sgd.cpp.html">nn_sgd_kernel</a>, <a href="source/examples/shaders/nn_binary_loss.cpp.html">nn_binary_loss_kernel</a>.</p>
+<h3 id="example-cnn-train-a-small-convolutional-network"><code>example_cnn</code> · Train a small convolutional network</h3>
+<p>Train both 3×3 filters and the output classifier in a compact 23-parameter CNN. Separate prediction and update pipelines share the same parameter storage.</p>
+<p><a href="source/examples/cnn.cpp.html">Read the host program</a> · <a href="neural.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/cnn_infer.cpp.html">cnn_infer_kernel</a>, <a href="source/examples/shaders/cnn_gradient.cpp.html">cnn_gradient_kernel</a>, <a href="source/examples/shaders/nn_sgd.cpp.html">nn_sgd_kernel</a>, <a href="source/examples/shaders/nn_binary_loss.cpp.html">nn_binary_loss_kernel</a>.</p>
+<h3 id="example-transformer-train-a-small-attention-model"><code>example_transformer</code> · Train a small attention model</h3>
+<p>Train all 134 parameters of a four-token, width-four attention model with positional features, RMS normalization, residual feed-forward layers and a two-class head. The example checks analytic derivatives against an independent double-precision oracle.</p>
+<p><a href="source/examples/transformer.cpp.html">Read the host program</a> · <a href="neural.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/transformer_infer.cpp.html">transformer_infer_kernel</a>, <a href="source/examples/shaders/transformer_gradient.cpp.html">transformer_gradient_kernel</a>, <a href="source/examples/shaders/nn_sgd.cpp.html">nn_sgd_kernel</a>.</p>
+<h2 id="data-validation-and-measurement">Data, validation and measurement</h2>
+<h3 id="example-real-data-run-the-algorithms-on-public-inputs"><code>example_real_data</code> · Run the algorithms on public inputs</h3>
+<p>Evaluate image, waveform, event and digit fixtures. The seven-stage LeNet-style model uses 61,706 trained parameters and compares held-out MNIST labels and independent framework logits. Other cases report backend and oracle checks appropriate to their inputs.</p>
+<p><a href="source/examples/real_data.cpp.html">Read the host program</a> · <a href="datasets.html">Step-by-step guide</a></p>
+<p><strong>Kernels:</strong> <a href="source/examples/shaders/lenet_conv.cpp.html">lenet_conv_kernel</a>, <a href="source/examples/shaders/lenet_pool.cpp.html">lenet_pool_kernel</a>, <a href="source/examples/shaders/lenet_dense.cpp.html">lenet_dense_kernel</a>.</p>
+<details><summary>Look inside the host program</summary>
+<pre><code class="language-cpp"><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">affine</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">63u</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">64u</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Dispatch the affine stage with its configured geometry.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">clamp</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">31u</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">32u</span><span class="tok-p">)</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">backend</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">cpu</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">&gt;</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-c1">// Dispatch the clamp stage with its configured geometry.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">sum</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-mi">1</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Force one stage onto CPU in a mixed pipeline.</span>
+<span class="tok-w"> </span><span class="tok-n">data</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">evaluate</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Compare the complete real-data pipeline outputs on CPU and the requested GPU backend.</span>
+<span class="tok-w"> </span><span class="tok-n">run</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Select the same execution backend for this complete case.</span>
+<span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">NASA mixed CPU/GPU resources</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Use the exact diagnostic or comparison label for this case.</span>
+<span class="tok-w"> </span><span class="tok-n">hybrid</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-c1">// Validate real-data ownership changes between backends.</span>
+<span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-o">&amp;</span><span class="tok-n">clipped_check</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-o">&amp;</span><span class="tok-n">total_check</span><span class="tok-p">}</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Validate real-data ownership changes between backends.</span>
+<span class="tok-w"> </span><span class="tok-k">if</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">gpu</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Exercise the library's headless asynchronous GPU path.</span>
+<span class="tok-w"> </span><span class="tok-n">stages</span><span class="tok-p">.</span><span class="tok-n">prepare</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">device</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Compile programs and allocate resources before polling.</span>
+<span class="tok-w"> </span><span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">completion</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-c1">// Queue the GPU work and obtain its completion fence.</span>
+<span class="tok-w"> </span><span class="tok-n">stages</span><span class="tok-p">.</span><span class="tok-n">submit</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">run</span><span class="tok-p">.</span><span class="tok-n">device</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Queue the GPU work and obtain its completion fence.</span>
+<span class="tok-w"> </span><span class="tok-k">while</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-o">!</span><span class="tok-n">completion</span><span class="tok-p">.</span><span class="tok-n">ready</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Poll the completion fence from the context thread.</span>
+<span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">this_thread</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-w"> </span><span class="tok-c1">// Allow other application work while processing remains in flight.</span>
+<span class="tok-w"> </span><span class="tok-nf">yield</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Allow other application work while processing remains in flight.</span>
+</code></pre>
+</details>
+<h3 id="example-benchmark-measure-completed-cpu-and-gpu-operations"><code>example_benchmark</code> · Measure completed CPU and GPU operations</h3>
+<p>Measure 25 resident operations after preparation and warmup. GPU timings include dispatch completion. The timed interval starts after compilation and initial uploads and ends before final downloads, measuring the completed resident processing workload.</p>
+<p><a href="source/examples/benchmark.cpp.html">Read the host program</a> · <a href="results.html">Step-by-step guide</a></p>
+<h2 id="inspect-an-embedded-gpu-program">Inspect an embedded GPU program</h2>
+<p>The <code>export_shader</code> utility exports an embedded GPU program for a chosen factory and profile. Use it to inspect the source passed to the driver or to check that program with a GLSL compiler. Application pipelines use the embedded programs directly.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Export a registered native shader using the GLES 3.1 profile.</span>
+./build/export_shader<span class="tok-w"> </span>affine_kernel<span class="tok-w"> </span>es31<span class="tok-w"> </span>&gt;<span class="tok-w"> </span>affine.comp
+<span class="tok-c1"># Validate the exported compute shader when glslangValidator is installed.</span>
+glslangValidator<span class="tok-w"> </span>-S<span class="tok-w"> </span>comp<span class="tok-w"> </span>affine.comp
+</code></pre>
+<p><a href="source/examples/export_shader.cpp.html">Read the exporter</a>, the <a href="portability.html">import and portability guide</a>, and the <a href="corpus.html">public-source verification report</a>.</p>
+<h2 id="native-kernel-catalog">Native kernel catalog</h2>
+<p>Every source below registers the filename stem followed by <code>_kernel</code>. The shared math kernel is used by the math parity checks. Some shaders are reused by several example applications.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Native source and factory</th>
+<th scope="col">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="source/examples/shaders/affine.cpp.html">affine_kernel</a></td>
+<td>Apply a scale and offset to a buffer.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/ann_gradient.cpp.html">ann_gradient_kernel</a></td>
+<td>Analytic binary cross-entropy gradients for every row and every ANN parameter.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/ann_infer.cpp.html">ann_infer_kernel</a></td>
+<td>A fully connected 2 -&gt; ReLU(8) -&gt; sigmoid(1) classifier, one invocation per row.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/bayer_unpack.cpp.html">bayer_unpack_kernel</a></td>
+<td>Decode byte-addressed Bayer8, little-endian Bayer16, MIPI RAW10 or MIPI RAW12.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/blur.cpp.html">blur_kernel</a></td>
+<td>A 3x3 image filter with explicit edge clamping, identical on CPU and GPU.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/buffer_to_image.cpp.html">buffer_to_image_kernel</a></td>
+<td>Demonstrate the same resource moving from an SSBO into an r32f image.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/clamp.cpp.html">clamp_kernel</a></td>
+<td>A second stage can use a different workgroup size and share buffer objects.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/cnn_gradient.cpp.html">cnn_gradient_kernel</a></td>
+<td>Train convolution coefficients, biases, and the classifier head with analytic gradients.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/cnn_infer.cpp.html">cnn_infer_kernel</a></td>
+<td>8x8 grayscale -&gt; two valid 3x3 filters -&gt; ReLU -&gt; global mean -&gt; sigmoid classifier.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/convolution2d.cpp.html">convolution2d_kernel</a></td>
+<td>Two-channel 2D convolution, x/y can also hold a complex sample's real/imaginary</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/convolution3d.cpp.html">convolution3d_kernel</a></td>
+<td>Scalar-volume 3D convolution with dynamic coefficients and clamp-to-edge.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/debayer.cpp.html">debayer_kernel</a></td>
+<td>Bilinear demosaicing of all four Bayer phases, with clamp-to-edge sampling.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/dft_columns.cpp.html">dft_columns_kernel</a></td>
+<td>The second separable DFT stage transforms columns of a complex vec2 buffer.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/dft_rows.cpp.html">dft_rows_kernel</a></td>
+<td>Educational direct DFT along each row of a row-major complex vec2 buffer.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/evt3_emit.cpp.html">evt3_emit_kernel</a></td>
+<td>Decode blocks concurrently into disjoint compact output intervals, in input order.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/evt3_flow.cpp.html">evt3_flow_kernel</a></td>
+<td>Estimate normal optical flow by fitting a local plane to event timestamps.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/evt3_reset.cpp.html">evt3_reset_kernel</a></td>
+<td>Reset state inside a pipeline when independent batches or reproducible timings are needed.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/evt3_seed.cpp.html">evt3_seed_kernel</a></td>
+<td>Resolve inter-block dependencies using small summaries, retaining stream state.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/evt3_summary.cpp.html">evt3_summary_kernel</a></td>
+<td>Summarize independent EVT3 blocks. Two 16-bit sensor words share each uint.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/fft_bit_reverse.cpp.html">fft_bit_reverse_kernel</a></td>
+<td>Arrange complex values in the order needed by radix-two butterflies.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/fft_butterfly.cpp.html">fft_butterfly_kernel</a></td>
+<td>Apply one radix-two FFT stage with precomputed complex phases.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/gaussian_horizontal.cpp.html">gaussian_horizontal_kernel</a></td>
+<td>First pass of a separable Gaussian approximation: [1,4,6,4,1] / 16.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/gaussian_vertical.cpp.html">gaussian_vertical_kernel</a></td>
+<td>Second Gaussian pass, its separate output avoids in-place neighborhood races.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/harris_response.cpp.html">harris_response_kernel</a></td>
+<td>Smooth the structure tensor with a 3x3 [1,2,1] outer product, then evaluate Harris.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/harris_tensor.cpp.html">harris_tensor_kernel</a></td>
+<td>Encode the symmetric gradient outer product as (dx<em>dx,dx</em>dy,dy*dy,0).</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/image_to_buffer.cpp.html">image_to_buffer_kernel</a></td>
+<td>End an image pipeline with an SSBO, ready for another stage or host readback.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/lenet_conv.cpp.html">lenet_conv_kernel</a></td>
+<td>Apply a valid convolution with optional zero padding and ReLU.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/lenet_dense.cpp.html">lenet_dense_kernel</a></td>
+<td>Apply a learned dense layer with an optional ReLU activation.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/lenet_pool.cpp.html">lenet_pool_kernel</a></td>
+<td>Downsample independent channel planes with two-by-two average pooling.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/luminance.cpp.html">luminance_kernel</a></td>
+<td>Linear RGB to Rec.709 luminance. Transfer-function decoding belongs upstream.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/math.cpp.html">math_kernel</a></td>
+<td>Native GLSL compute source. The build compiles a generated C++11 adapter and</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/nn_binary_loss.cpp.html">nn_binary_loss_kernel</a></td>
+<td>Compute mean binary cross-entropy for a small validation batch.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/nn_sgd.cpp.html">nn_sgd_kernel</a></td>
+<td>Batch-reduce independent parameter gradients and perform an in-place SGD update.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/nonmax.cpp.html">nonmax_kernel</a></td>
+<td>Keep positive response peaks, deterministic index ordering breaks equal-value ties.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rgba_float_image.cpp.html">rgba_float_image_kernel</a></td>
+<td>GLES requires separate readonly/writeonly declarations for RGBA images.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rgba_int_image.cpp.html">rgba_int_image_kernel</a></td>
+<td>Signed integer RGBA images use the same two-port pattern on every profile.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rgba_uint_image.cpp.html">rgba_uint_image_kernel</a></td>
+<td>Unsigned integer image math uses exact integer-valued image loads and stores.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_count.cpp.html">rle_count_kernel</a></td>
+<td>Count compact (value,run length) pairs independently within each fixed-size tile.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_decode.cpp.html">rle_decode_kernel</a></td>
+<td>Reconstruct each tile from its compact range, preserving every input sample bit.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_encode.cpp.html">rle_encode_kernel</a></td>
+<td>Lossless tiled RLE: disjoint tile ranges produce one compact global word stream.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/rle_offsets.cpp.html">rle_offsets_kernel</a></td>
+<td>Serial prefix stage for a small tile table, independent encoders use these offsets.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/scalar_images.cpp.html">scalar_images_kernel</a></td>
+<td>Three image bindings fit even the minimum GLES 3.1 compute image limit.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/signal_biquad.cpp.html">signal_biquad_kernel</a></td>
+<td>Transposed direct-form II biquad, one sequential channel per invocation.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/signal_fir.cpp.html">signal_fir_kernel</a></td>
+<td>Causal FIR over independent channel-major samples, with zero-prefix batch history.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/signal_frequency_mask.cpp.html">signal_frequency_mask_kernel</a></td>
+<td>Apply a symmetric low-pass, high-pass, band-pass, or band-stop FFT response.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/signal_window.cpp.html">signal_window_kernel</a></td>
+<td>Apply a rectangular, Hann, Hamming, or Blackman window before a block FFT.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/sobel.cpp.html">sobel_kernel</a></td>
+<td>Normalized Sobel gradients, stored as (dx,dy) in one std430 vec2 element.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/sum.cpp.html">sum_kernel</a></td>
+<td>A small deterministic reduction: one invocation reads the preceding stage.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/transformer_gradient.cpp.html">transformer_gradient_kernel</a></td>
+<td>Generated by scripts/generate_transformer.py. Edit its shared function body.</td>
+</tr>
+<tr>
+<td><a href="source/examples/shaders/transformer_infer.cpp.html">transformer_infer_kernel</a></td>
+<td>Generated by scripts/generate_transformer.py. Edit its shared function body.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="browse-every-file">Browse every file</h2>
+<p>Read or download the complete applications, shaders, reusable pipeline wrappers and runtime header in the <a href="source/index.html">source browser</a>.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#buffers-and-execution">Buffers and execution</a></li><li><a href="#imaging-and-spectral-processing">Imaging and spectral processing</a></li><li><a href="#events-and-neural-models">Events and neural models</a></li><li><a href="#data-validation-and-measurement">Data, validation and measurement</a></li><li><a href="#inspect-an-embedded-gpu-program">Inspect an embedded GPU program</a></li><li><a href="#native-kernel-catalog">Native kernel catalog</a></li><li><a href="#browse-every-file">Browse every file</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

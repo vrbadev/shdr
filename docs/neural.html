@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Train and run small neural networks"><title>Train and run small neural networks · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="train-and-run-small-neural-networks">Train and run small neural networks</h1>
+<p>The neural examples implement complete forward passes and parameter gradients with ordinary shdr buffers and compute shaders. Native C++/GLSL pipelines run training and inference on the CPU or GPU. These fixed architectures demonstrate how compute stages and resources form a model. A deeper LeNet-style classifier deploys prepared weights through native inference, with optional offline training in PyTorch.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_neural
+<span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_cnn
+<span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_transformer
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_neural<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_cnn<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_transformer<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<p>Each executable initializes repeatable inputs and parameters, checks gradients,
+trains the model and reports loss and classification accuracy.</p>
+<h2 id="choose-a-model">Choose a model</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Example</th>
+<th scope="col">Architecture</th>
+<th scope="col" style="text-align:right">Trainable parameters</th>
+<th scope="col">Seeded task</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ANN</td>
+<td>Two features → eight ReLU neurons → sigmoid output</td>
+<td style="text-align:right">33</td>
+<td>Noisy XOR classification</td>
+</tr>
+<tr>
+<td>CNN</td>
+<td>8×8 grayscale → two valid 3×3 filters → ReLU → global mean → sigmoid</td>
+<td style="text-align:right">23</td>
+<td>Horizontal versus vertical bars</td>
+</tr>
+<tr>
+<td>Transformer</td>
+<td>Four tokens of width four → attention → normalization → feed-forward residual → two-class head</td>
+<td style="text-align:right">134</td>
+<td>Noisy two-class sequences</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every parameter participates in gradient computation, including hidden layers, convolution coefficients, attention matrices, positional features and classifier heads. The reported loss and classification counts describe the seeded training tasks. The <a href="datasets.html">public-data evaluator</a> also fits real MNIST zero/one mini-batches with these models. The deeper classifier has a separate held-out ten-class digit evaluation.</p>
+<h2 id="train-an-ann-or-cnn">Train an ANN or CNN</h2>
+<p><a href="source/examples/neural_support.hpp.html">neural_support.hpp</a> provides
+<code>shdr_examples::binary_network</code>. Its first constructor argument chooses the CNN.
+Its second is the batch size. The constructor supplies seeded data and initial
+parameters, so this is a runnable CPU training loop:</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/neural_support.hpp"</span><span class="tok-c1"> // Use the small fully trainable binary-network wrapper.</span>
+<span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">&lt;iostream&gt;</span><span class="tok-c1"> // Print the evaluated mean loss.</span>
+<span class="tok-kt">int</span><span class="tok-w"> </span><span class="tok-nf">main</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Train and evaluate the same model through compute pipelines.</span>
+<span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">binary_network</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">(</span><span class="tok-nb">false</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">32</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Choose the two-feature ANN with a batch of 32 samples.</span>
+<span class="tok-w"> </span><span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-mi">160</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">step</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Perform the demonstrated number of training steps.</span>
+<span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">training_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Compute analytic gradients and update every parameter on the CPU.</span>
+<span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">evaluation_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Run inference and calculate mean binary cross entropy.</span>
+<span class="tok-w"> </span><span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">loss</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">loss</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Read loss through a const host view.</span>
+<span class="tok-w"> </span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">cout</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-s">"</span><span class="tok-s">Mean loss: </span><span class="tok-s">"</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-n">loss</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">[</span><span class="tok-mi">0</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-sc">'</span><span class="tok-sc">\n</span><span class="tok-sc">'</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Print the completed mean loss.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// Release the model resources after evaluation.</span>
+</code></pre>
+<p>Attach its shader sources to the executable with the build helper:</p>
+<pre><code class="language-cmake"><span class="tok-nb">shdr_target_shaders</span><span class="tok-p">(</span><span class="tok-s">app</span><span class="tok-w"> </span><span class="tok-s">PRIVATE</span><span class="tok-w"> </span><span class="tok-s">SOURCES</span><span class="tok-w"> </span><span class="tok-c"># Compile and embed each ANN training and evaluation stage.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/ann_infer.cpp</span><span class="tok-w"> </span><span class="tok-c"># Compute the network's forward prediction.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/ann_gradient.cpp</span><span class="tok-w"> </span><span class="tok-c"># Compute all analytic per-sample parameter gradients.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/nn_sgd.cpp</span><span class="tok-w"> </span><span class="tok-c"># Average batch gradients and apply SGD updates.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/nn_binary_loss.cpp</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c"># Reduce prediction errors into a mean loss.</span>
+</code></pre>
+<p>For a CNN, construct <code>binary_network(true, 32)</code>, substitute <code>cnn_infer.cpp</code> and
+<code>cnn_gradient.cpp</code>, and keep the shared SGD and loss modules. The bundled CNN
+example trains for 180 updates.</p>
+<p>For headless GPU execution, link <code>shdr::egl</code> and use a device:</p>
+<pre><code class="language-cpp"><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">headless_device</span><span class="tok-w"> </span><span class="tok-n">gpu</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create a default ES 3.1 headless device.</span>
+<span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">training_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">prepare</span><span class="tok-p">(</span><span class="tok-n">gpu</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Prepare programs and resources before the training loop.</span>
+<span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-mi">160</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">step</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Perform the same number of GPU training steps.</span>
+<span class="tok-w">    </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">training_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">gpu</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Compute gradients and update parameters on the GPU.</span>
+<span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">evaluation_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-n">gpu</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Evaluate predictions and loss on the GPU.</span>
+</code></pre>
+<p>The training pipeline computes per-sample gradients, then updates parameters using their batch mean. Prediction is a separate inference stage, and evaluation adds mean binary cross-entropy. <code>gradient_pipeline()</code> writes derivatives and preserves parameter values. <code>reset_parameters()</code> restores the deterministic initial weights.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Public buffer</th>
+<th scope="col">Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inputs</code></td>
+<td>Sample-major features: two floats per ANN sample or 64 per CNN image</td>
+</tr>
+<tr>
+<td><code>targets</code></td>
+<td>One binary target, zero or one, per sample</td>
+</tr>
+<tr>
+<td><code>parameters</code></td>
+<td>All trainable weights and biases</td>
+</tr>
+<tr>
+<td><code>gradients</code></td>
+<td><code>batch_count * parameter_count</code> sample-major derivatives</td>
+</tr>
+<tr>
+<td><code>predictions</code></td>
+<td>One sigmoid probability per sample</td>
+</tr>
+<tr>
+<td><code>loss</code></td>
+<td>One batch-mean binary cross-entropy value after evaluation</td>
+</tr>
+</tbody>
+</table></div>
+<p>Supply custom data by writing the allocated input and target buffers. Use
+<code>parameter_count()</code> and <code>batch_count()</code> for dimensions. The default SGD learning
+rates are 0.4 for the ANN and 1.5 for the CNN. These settings belong to the small
+seeded fixtures. Tune training settings when building another model or dataset.</p>
+<h2 id="train-the-transformer">Train the transformer</h2>
+<p><a href="source/examples/transformer_support.hpp.html">transformer_support.hpp</a> provides a
+four-token classifier with a configurable batch size and learning rate:</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/transformer_support.hpp"</span><span class="tok-c1"> // Use the four-token transformer demonstration wrapper.</span>
+
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">transformer_model</span><span class="tok-w"> </span><span class="tok-nf">model</span><span class="tok-p">(</span><span class="tok-mi">8</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">0.15f</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Allocate eight samples and use a learning rate of 0.15.</span>
+<span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">step</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-mi">32</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">step</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Perform the demonstrated transformer training steps.</span>
+<span class="tok-w">    </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">training_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Compute analytic gradients and update all model parameters.</span>
+<span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">prediction_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Run a separate forward prediction dispatch.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">float</span><span class="tok-w"> </span><span class="tok-n">mean_loss</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">loss</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Calculate the mean loss from completed predictions.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">correct</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">correct</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Count samples whose predicted class matches their label.</span>
+</code></pre>
+<p>Attach <code>transformer_infer.cpp</code>, <code>transformer_gradient.cpp</code> and <code>nn_sgd.cpp</code> to
+the executable. Both model pipelines accept <code>run(gpu)</code> for GPU execution.
+<code>reset_inputs(seed)</code> recreates the balanced sequence fixture, while
+<code>reset_parameters(seed)</code> restores initial weights. Replace <code>inputs</code> with
+sample-major, token-major floating features and <code>labels</code> with class IDs zero
+or one to supply a compatible batch.</p>
+<p>The forward pass adds learned positional features, computes one scaled Q/K/V
+attention head, projects its output and adds a residual. RMS normalization has
+learned scales. A width-four ReLU feed-forward block adds another residual.
+Mean token pooling feeds the two-class classifier. Softmax and cross-entropy
+use shifted logits for numerical stability.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Parameter indices</th>
+<th scope="col">Learned family</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–15</td>
+<td>Four positional feature vectors</td>
+</tr>
+<tr>
+<td>16–31 / 32–47 / 48–63</td>
+<td>Query / key / value matrices</td>
+</tr>
+<tr>
+<td>64–79</td>
+<td>Attention output projection</td>
+</tr>
+<tr>
+<td>80–83</td>
+<td>RMS normalization scales</td>
+</tr>
+<tr>
+<td>84–99 / 100–103</td>
+<td>First feed-forward weights / biases</td>
+</tr>
+<tr>
+<td>104–119 / 120–123</td>
+<td>Second feed-forward weights / biases</td>
+</tr>
+<tr>
+<td>124–131 / 132–133</td>
+<td>Classifier weights / biases</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>inputs</code> holds sixteen floats per sequence. <code>parameters</code> holds 134 floats, and
+<code>gradients</code> holds <code>batch_count * 134</code> floats. Each <code>predictions</code> element is
+<code>vec4(probability_class_0, probability_class_1, cross_entropy, predicted_class)</code>.
+The predicted class is zero or one represented as a float. <code>loss()</code> and
+<code>correct()</code> read the completed prediction buffer and can download GPU results.</p>
+<p>The transformer gradient uses analytic forward-mode differentiation: <code>vec2</code> holds a value and one parameter derivative. Each <code>(sample, parameter)</code> invocation evaluates a forward pass, and the shared SGD stage reduces the batch. This independent-invocation design trains every parameter and repeats forward work for each derivative. Large models benefit from the efficiency of reverse-mode differentiation.</p>
+
+<h2 id="understand-the-update-pipeline">Understand the update pipeline</h2>
+<p>Training kernels write <code>gradients[sample * parameter_count + parameter]</code>, so
+each invocation owns a distinct output. The <code>nn_sgd_kernel</code> gives each
+parameter its own invocation and applies:</p>
+<pre><code class="language-text">parameter -= learning_rate * (mean_sample_gradient + weight_decay * parameter)
+</code></pre>
+<p>Its named ports are <code>gradients</code> and <code>parameters</code>. Its uniforms are
+<code>batch_count</code>, <code>parameter_count</code>, <code>learning_rate</code> and <code>weight_decay</code>. The examples
+use zero weight decay. The gradient stage finishes before the update dispatch
+reads its output. Parameter writes then become visible to subsequent inference
+or training stages. At most four storage-buffer ports are used per model stage,
+within the guaranteed ES 3.1 compute baseline.</p>
+<p>Inference reads trained parameters and writes predictions. Attach the inference module, create its kernel with <code>make_kernel</code>, bind input, parameter and output buffers, and set <code>batch_count</code>. The transformer also binds labels for its loss diagnostic. Predicted probabilities depend on inputs and parameters. Applications use the embedded shader programs.</p>
+<h2 id="run-a-lenet-style-digit-classifier">Run a LeNet-style digit classifier</h2>
+<p><code>shdr_examples::lenet_classifier</code> in
+<a href="source/examples/lenet_support.hpp.html">lenet_support.hpp</a> runs a modern LeNet-5-style
+network with 61,706 parameters. It uses full second-layer connectivity, ReLU,
+fixed average pooling and linear final logits. These choices differ from the
+original 1998 LeNet-5 architecture.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Stage</th>
+<th scope="col">Per-image output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5×5 convolution, one input channel, six output channels, ReLU</td>
+<td>6×28×28, with a two-pixel input zero border</td>
+</tr>
+<tr>
+<td>2×2 average pooling</td>
+<td>6×14×14</td>
+</tr>
+<tr>
+<td>5×5 valid convolution, six input channels, sixteen output channels, ReLU</td>
+<td>16×10×10</td>
+</tr>
+<tr>
+<td>2×2 average pooling</td>
+<td>16×5×5</td>
+</tr>
+<tr>
+<td>Dense layer and ReLU</td>
+<td>120 features from 400 flattened values</td>
+</tr>
+<tr>
+<td>Dense layer and ReLU</td>
+<td>84 features</td>
+</tr>
+<tr>
+<td>Dense classifier</td>
+<td>Ten logits</td>
+</tr>
+</tbody>
+</table></div>
+<p>The seven stages reuse three native modules: <code>lenet_conv.cpp</code>, <code>lenet_pool.cpp</code>
+and <code>lenet_dense.cpp</code>. Attach them to the executable with <code>shdr_target_shaders</code>.
+Input and intermediate buffers stay on the selected backend until their results
+are needed on the host.</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/lenet_support.hpp"</span><span class="tok-c1"> // Use the seven-stage native classifier.</span>
+<span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/real_data_support.hpp"</span><span class="tok-c1"> // Read the prepared plain binary fixtures.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">weights</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">real_data</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">floats</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">lenet_weights.bin</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Load the prepared flat float32 parameters.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">images</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">real_data</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">bytes</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">mnist_test.bin</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Read held-out digit image bytes.</span>
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">lenet_classifier</span><span class="tok-w"> </span><span class="tok-nf">model</span><span class="tok-p">(</span><span class="tok-mi">1</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Allocate activations for one digit image.</span>
+<span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">load_parameters</span><span class="tok-p">(</span><span class="tok-n">weights</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Check the parameter count and finite values.</span>
+<span class="tok-k">auto</span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">inputs</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Access the host input before dispatching inference.</span>
+<span class="tok-k">for</span><span class="tok-w"> </span><span class="tok-p">(</span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-mi">0</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-n">i</span><span class="tok-w"> </span><span class="tok-o">&lt;</span><span class="tok-w"> </span><span class="tok-mi">784</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">+</span><span class="tok-n">i</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-w"> </span><span class="tok-c1">// Copy the first 28-by-28 held-out image.</span>
+<span class="tok-w"> </span><span class="tok-n">input</span><span class="tok-p">[</span><span class="tok-n">i</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">images</span><span class="tok-p">[</span><span class="tok-n">i</span><span class="tok-p">]</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mf">255.f</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Match the zero-to-one training input scale.</span>
+<span class="tok-p">}</span><span class="tok-w"> </span><span class="tok-c1">// The convolution stage supplies the zero border internally.</span>
+<span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">inference_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Or run(gpu) for the same complete GPU network.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-kt">float</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">scores</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">model</span><span class="tok-p">.</span><span class="tok-n">logits</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Read scores through a const host view.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">float</span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">logits</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">scores</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Obtain ten completed unnormalized class scores.</span>
+</code></pre>
+<p>Choose the class with the largest logit. The helper accepts batches from one to
+512 images. <code>inputs</code> contains <code>batch_count * 784</code> floats and <code>logits</code> contains
+<code>batch_count * 10</code>. Parameters use convolution order <code>[out,in,ky,kx]</code> and dense
+order <code>[out,in]</code>, with each layer's biases immediately after its weights.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Layer</th>
+<th scope="col" style="text-align:right">Weight offset</th>
+<th scope="col" style="text-align:right">Bias offset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First convolution</td>
+<td style="text-align:right">0</td>
+<td style="text-align:right">150</td>
+</tr>
+<tr>
+<td>Second convolution</td>
+<td style="text-align:right">156</td>
+<td style="text-align:right">2556</td>
+</tr>
+<tr>
+<td>Dense 120</td>
+<td style="text-align:right">2572</td>
+<td style="text-align:right">50572</td>
+</tr>
+<tr>
+<td>Dense 84</td>
+<td style="text-align:right">50692</td>
+<td style="text-align:right">60772</td>
+</tr>
+<tr>
+<td>Dense 10</td>
+<td style="text-align:right">60856</td>
+<td style="text-align:right">61696</td>
+</tr>
+</tbody>
+</table></div>
+<p>The included model was prepared with three complete epochs of the 60,000-image
+MNIST training split, Adam at learning rate 0.001, batch size 128 and seed
+12345. Independent PyTorch evaluation of all 10,000 held-out images recorded
+97.78% accuracy. These are the model-preparation results in
+<a href="source/scripts/data_sources.py.html">training provenance</a>. The real-data
+executable separately checks native CPU/GPU logits against the framework scores
+and reports accuracy against the original test labels. Full native runs reproduced
+97.78% on every recorded CPU/GPU path. The <a href="results.html">data results</a>
+contain the measured accuracy, numerical errors and evaluation times.</p>
+<p>Preparation is optional. To retrain and export plain weights, install PyTorch
+and NumPy in a preparation environment, then use the checked source cache:</p>
+<pre><code class="language-sh"><span class="tok-c1"># Train on the official training split and export weights and independent test logits.</span>
+python3<span class="tok-w"> </span>scripts/train_lenet.py<span class="tok-w"> </span>--cache<span class="tok-w"> </span>build/datasets/upstream
+</code></pre>
+<p>The deployed C++ program reads <code>lenet_weights.bin</code> and runs the seven-stage classifier through the single-header runtime. The three smaller models demonstrate native analytic training. See the <a href="datasets.html">data guide</a> for preprocessing, source terms, preparation packages and the full held-out evaluation.</p>
+<h2 id="validation-and-limits">Validation and limits</h2>
+<p>The ANN and CNN compare every analytic parameter gradient with central differences from an independent double-precision prediction oracle. GPU runs compare gradients, trained weights and probabilities with CPU results. The transformer checks predictions and all 134 analytic derivatives against its independent double-precision oracle. GPU runs compare parameters, gradients and predictions with a separately trained CPU model, and check parameter-family changes, loss reduction and classification. Finite differences validate the implementations. Training uses the analytic gradients.</p>
+<p>The ANN uses eight fixed ReLU neurons. The CNN uses stride-one valid cross-correlation and two 6×6 activation maps. The transformer uses one attention head over all four fixed tokens. These examples train fixed float32 architectures with SGD. Model import, serialization, mixed precision, large tensor operations, distributed training and adaptive optimizers require additional application-specific implementations. Compare CPU and GPU float results with tolerances suitable for the algorithm, particularly near ReLU boundaries.</p>
+<p>Keep inputs and parameters stable during a dispatch. Serialize training jobs that share parameter storage. Concurrent inference can share immutable parameters and inputs while using distinct writable outputs. Read GPU losses and predictions at deliberate synchronization points. See <a href="async.html">asynchronous execution</a> for background work and finite resource rings, and <a href="portability.html">portability</a> for source and layout rules.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#choose-a-model">Choose a model</a></li><li><a href="#train-an-ann-or-cnn">Train an ANN or CNN</a></li><li><a href="#train-the-transformer">Train the transformer</a></li><li><a href="#understand-the-update-pipeline">Understand the update pipeline</a></li><li><a href="#run-a-lenet-style-digit-classifier">Run a LeNet-style digit classifier</a></li><li><a href="#validation-and-limits">Validation and limits</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

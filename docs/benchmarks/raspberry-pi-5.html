@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Raspberry Pi 5 and Broadcom V3D: pipeline benchmark"><title>Raspberry Pi 5 and Broadcom V3D: pipeline benchmark · shdr 1.0.0</title><link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="../highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="../index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="../index.html">Start</a><a href="../examples.html">Examples</a><a href="../results.html">Results</a><a href="../corpus.html">Public shaders</a><a href="../api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Hardware report</p><h1 id="raspberry-pi-5-and-broadcom-v3d-pipeline-benchmark">Raspberry Pi 5 and Broadcom V3D: pipeline benchmark</h1>
+<p>Measurements recorded on 2026-10-15.</p>
+<ul>
+<li>CPU: four Cortex-A76 cores, maximum 2.4 GHz. Ondemand governor.</li>
+<li>Board: Raspberry Pi 5 Model B Rev 1.0.</li>
+<li>Platform: Ubuntu 24.04.4 LTS, aarch64, Linux 6.8.0-1065-raspi.</li>
+<li>Compiler: GCC 13.3.0. CMake 3.28.3. Python 3.12.3. Glslang 15.1.0.</li>
+<li>Renderer: Broadcom V3D 7.1.7.0, hardware rendering.</li>
+<li>Driver: OpenGL ES 3.1 Mesa 25.2.8-0ubuntu0.24.04.2. ESSL 3.10.</li>
+<li>Contexts: ES 3.1 available. ES 3.2 and desktop GL requests returned EGL_BAD_MATCH (0x3009).</li>
+<li>Validation: 41 tests passed, 68 unavailable-context tests skipped, zero failures. 109 tests total.</li>
+<li>Offline GLSL validation: 250 shader/profile combinations passed.</li>
+</ul>
+<h2 id="method">Method</h2>
+<p>All pipelines use seed <code>12345</code>, scale <code>1</code>, twenty timed repetitions and the <code>es31</code> profile. Times are mean completed workload milliseconds. CPU stages execute serially, and the asynchronous ring uses two CPU workers. GPU timings include dispatch-loop completion. Timing starts after compilation, initial uploads and warmup, and ends before final downloads. Mixed-backend transfers occur within the timed interval. The dynamic library is loaded before timing.</p>
+<p>The asynchronous row measures thirty-two completed affine jobs of 257 floats through three reusable slots, including submission and polling. Each neural training row measures one mini-batch gradient/SGD update, and inference measures a separate forward dispatch. The executables check full training convergence separately.</p>
+<p>The EVT3 workload decodes 65536 sixteen-bit words into 223772 ordered <code>uvec4</code> events through five stages including reset. Its timing covers those decoder stages. The optical-flow workload uses 610 seeded samples from a 32×24 temporal plane, history 64 and six linked stages. The RLE workload produces 13556 payload words plus 257 offset words, a 4.74-fold size reduction.</p>
+<p>The FFT rows transform eight complex channels of length 1024. The FIR row
+filters eight real channels of 2048 samples with 65 coefficients. The biquad
+row uses the same channel and sample counts, retaining state between timed
+blocks after each backend starts from an identical reset. The frequency mask
+keeps the 4–10 kHz band at a 48 kHz sample rate.</p>
+<p>The LeNet row measures seven native inference stages for 32 images and 61,706
+parameters. Its resident inputs and parameters are seeded random values.
+The separate trained-model evaluation below uses original MNIST test images.</p>
+<p>The benchmark compares floating outputs with absolute and relative tolerances and unsigned outputs exactly. It checks Fourier reconstruction and compression round trips using seeded inputs and parameters. Each timing run has a dedicated measurement interval after builds and tests finish.</p>
+<pre><code class="language-sh"><span class="tok-c1"># Configure the example build directory.</span>
+cmake<span class="tok-w"> </span>-S<span class="tok-w"> </span>.<span class="tok-w"> </span>-B<span class="tok-w"> </span>build<span class="tok-w"> </span>-DCMAKE_BUILD_TYPE<span class="tok-o">=</span>Release
+<span class="tok-c1"># Compile the configured targets and embedded shaders.</span>
+cmake<span class="tok-w"> </span>--build<span class="tok-w"> </span>build<span class="tok-w"> </span>-j4
+<span class="tok-c1"># Run the registered correctness checks and report any failures.</span>
+ctest<span class="tok-w"> </span>--test-dir<span class="tok-w"> </span>build<span class="tok-w"> </span>--output-on-failure<span class="tok-w"> </span>-j2
+<span class="tok-c1"># Measure completed ES 3.1 workloads with the recorded benchmark settings.</span>
+<span class="tok-nv">SHDR_BENCH_ITERATIONS</span><span class="tok-o">=</span><span class="tok-m">20</span><span class="tok-w"> </span><span class="tok-nv">SHDR_BENCH_SCALE</span><span class="tok-o">=</span><span class="tok-m">1</span><span class="tok-w"> </span>build/example_benchmark<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<p>The measured runtime-header SHA-256 is
+<code>0555b3742fa5646d094747786a9d90bbda334bf0dfbf35c639b359224f571416</code>.
+The <a href="../results.html#provenance">results provenance</a> records the header and frontend fingerprints used for validation.</p>
+<h2 id="results">Results</h2>
+<p>CPU/GPU is the unrounded CPU mean divided by the unrounded graphics mean. A value
+above one means the graphics path completed faster for that workload. Table
+values are rounded to three decimal places.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Pipeline</th>
+<th scope="col">Workload</th>
+<th scope="col" style="text-align:right">CPU ms</th>
+<th scope="col" style="text-align:right">GPU ms</th>
+<th scope="col" style="text-align:right">CPU/GPU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Buffer affine/clamp/sum</td>
+<td>16384 floats</td>
+<td style="text-align:right">0.516</td>
+<td style="text-align:right">1.956</td>
+<td style="text-align:right">0.264</td>
+</tr>
+<tr>
+<td>Buffer/image blur</td>
+<td>128 x 128</td>
+<td style="text-align:right">1.033</td>
+<td style="text-align:right">0.471</td>
+<td style="text-align:right">2.192</td>
+</tr>
+<tr>
+<td>Borrowed image blur</td>
+<td>128 x 128</td>
+<td style="text-align:right">0.951</td>
+<td style="text-align:right">0.469</td>
+<td style="text-align:right">2.029</td>
+</tr>
+<tr>
+<td>Hybrid affine/clamp/sum</td>
+<td>16384 floats</td>
+<td style="text-align:right">0.597</td>
+<td style="text-align:right">2.188</td>
+<td style="text-align:right">0.273</td>
+</tr>
+<tr>
+<td>Dynamic library stages</td>
+<td>16384 floats</td>
+<td style="text-align:right">0.838</td>
+<td style="text-align:right">1.968</td>
+<td style="text-align:right">0.426</td>
+</tr>
+<tr>
+<td>RAW10/debayer/luminance</td>
+<td>128 x 128</td>
+<td style="text-align:right">2.466</td>
+<td style="text-align:right">2.522</td>
+<td style="text-align:right">0.978</td>
+</tr>
+<tr>
+<td>2D convolution 5 x 5</td>
+<td>128 x 128 vec2</td>
+<td style="text-align:right">3.283</td>
+<td style="text-align:right">2.444</td>
+<td style="text-align:right">1.343</td>
+</tr>
+<tr>
+<td>3D convolution 3 x 3 x 3</td>
+<td>24 x 24 x 24</td>
+<td style="text-align:right">3.156</td>
+<td style="text-align:right">3.020</td>
+<td style="text-align:right">1.045</td>
+</tr>
+<tr>
+<td>Forward/inverse direct DFT</td>
+<td>32 x 32 complex</td>
+<td style="text-align:right">2.589</td>
+<td style="text-align:right">0.579</td>
+<td style="text-align:right">4.472</td>
+</tr>
+<tr>
+<td>Gaussian/Sobel/Harris/NMS</td>
+<td>128 x 128</td>
+<td style="text-align:right">4.571</td>
+<td style="text-align:right">2.345</td>
+<td style="text-align:right">1.949</td>
+</tr>
+<tr>
+<td>Lossless tiled RLE round trip</td>
+<td>65536 uints</td>
+<td style="text-align:right">1.256</td>
+<td style="text-align:right">1.253</td>
+<td style="text-align:right">1.002</td>
+</tr>
+<tr>
+<td>EVT3 event decoding</td>
+<td>65536 packed words</td>
+<td style="text-align:right">4.873</td>
+<td style="text-align:right">6.988</td>
+<td style="text-align:right">0.697</td>
+</tr>
+<tr>
+<td>Async ring</td>
+<td>32 x 257 floats, 3 slots</td>
+<td style="text-align:right">0.143</td>
+<td style="text-align:right">1.976</td>
+<td style="text-align:right">0.072</td>
+</tr>
+<tr>
+<td>EVT3 + optical flow</td>
+<td>32 x 24 sampled plane, history 64</td>
+<td style="text-align:right">0.640</td>
+<td style="text-align:right">0.656</td>
+<td style="text-align:right">0.976</td>
+</tr>
+<tr>
+<td>ANN training</td>
+<td>32 samples, 33 parameters</td>
+<td style="text-align:right">0.206</td>
+<td style="text-align:right">0.114</td>
+<td style="text-align:right">1.804</td>
+</tr>
+<tr>
+<td>ANN inference</td>
+<td>32 samples, 33 parameters</td>
+<td style="text-align:right">0.006</td>
+<td style="text-align:right">0.037</td>
+<td style="text-align:right">0.173</td>
+</tr>
+<tr>
+<td>CNN training</td>
+<td>32 samples, 23 parameters</td>
+<td style="text-align:right">3.254</td>
+<td style="text-align:right">0.490</td>
+<td style="text-align:right">6.636</td>
+</tr>
+<tr>
+<td>CNN inference</td>
+<td>32 samples, 23 parameters</td>
+<td style="text-align:right">0.138</td>
+<td style="text-align:right">0.057</td>
+<td style="text-align:right">2.393</td>
+</tr>
+<tr>
+<td>Transformer training</td>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td style="text-align:right">2.404</td>
+<td style="text-align:right">0.729</td>
+<td style="text-align:right">3.296</td>
+</tr>
+<tr>
+<td>Transformer inference</td>
+<td>8 sequences, 4 tokens x 4, 134 parameters</td>
+<td style="text-align:right">0.018</td>
+<td style="text-align:right">0.055</td>
+<td style="text-align:right">0.330</td>
+</tr>
+<tr>
+<td>FFT forward/inverse</td>
+<td>8 x 1024 complex</td>
+<td style="text-align:right">5.936</td>
+<td style="text-align:right">4.174</td>
+<td style="text-align:right">1.422</td>
+</tr>
+<tr>
+<td>FIR low-pass</td>
+<td>8 x 2048 floats, 65 taps</td>
+<td style="text-align:right">6.570</td>
+<td style="text-align:right">5.499</td>
+<td style="text-align:right">1.195</td>
+</tr>
+<tr>
+<td>Biquad low-pass</td>
+<td>8 x 2048 floats, persistent state</td>
+<td style="text-align:right">0.156</td>
+<td style="text-align:right">0.691</td>
+<td style="text-align:right">0.226</td>
+</tr>
+<tr>
+<td>FFT band-pass</td>
+<td>8 x 1024 complex, 4-10 kHz</td>
+<td style="text-align:right">6.153</td>
+<td style="text-align:right">5.001</td>
+<td style="text-align:right">1.230</td>
+</tr>
+<tr>
+<td>LeNet classifier</td>
+<td>32 x 28 x 28, 61,706 parameters</td>
+<td style="text-align:right">116.491</td>
+<td style="text-align:right">136.617</td>
+<td style="text-align:right">0.853</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="complete-held-out-model-evaluation">Complete held-out model evaluation</h2>
+<p>The native seven-stage classifier used the prepared model and all 10,000
+original MNIST test images. Both backends produced 9778 correct predictions,
+matching the independent preparation result. Each score was compared with the
+shipped PyTorch reference logits. The normalized error is
+<code>abs(actual-reference)/(1+abs(reference))</code>, maximized across every score.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Backend</th>
+<th scope="col" style="text-align:right">Correct</th>
+<th scope="col" style="text-align:right">Accuracy</th>
+<th scope="col" style="text-align:right">Maximum normalized logit error</th>
+<th scope="col" style="text-align:right">Completed evaluation seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td style="text-align:right">9778/10000</td>
+<td style="text-align:right">97.78%</td>
+<td style="text-align:right">4.00418e-6</td>
+<td style="text-align:right">35.0628</td>
+</tr>
+<tr>
+<td>V3D, ES 3.1 profile</td>
+<td style="text-align:right">9778/10000</td>
+<td style="text-align:right">97.78%</td>
+<td style="text-align:right">4.57699e-6</td>
+<td style="text-align:right">41.5901</td>
+</tr>
+</tbody>
+</table></div>
+<p>These times include bounded batch construction, input preparation, program
+setup, native inference, result reads and reference comparisons. They are
+separate from the resident benchmark above. All other public-data functional
+cases passed in the same runs. See the <a href="../datasets.html">dataset guide</a> for
+source provenance, preparation and metric scope.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#method">Method</a></li><li><a href="#results">Results</a></li><li><a href="#complete-held-out-model-evaluation">Complete held-out model evaluation</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="../portability.html">Portability and requirements</a> · <a href="../source/index.html">Read the source</a></p></footer></body></html>

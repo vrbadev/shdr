@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Decode EVT3 event-camera streams"><title>Decode EVT3 event-camera streams · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="decode-evt3-event-camera-streams">Decode EVT3 event-camera streams</h1>
+<p>The EVT3 example turns packed sensor words into compact, ordered events using the
+same compute shaders on CPU and GPU. It demonstrates a stateful stream with
+parallel batch processing: each batch carries the decoder state into the next.</p>
+<p>Build the project, then run the independent reference checks:</p>
+<pre><code class="language-sh"><span class="tok-c1"># Run this example on the CPU.</span>
+./build/example_evt3
+<span class="tok-c1"># Run this example on the requested headless GPU profile.</span>
+./build/example_evt3<span class="tok-w"> </span>--gpu<span class="tok-w"> </span>es31
+</code></pre>
+<h2 id="recognize-the-input-format">Recognize the input format</h2>
+<p>EVT3 uses 16-bit words with a four-bit type and twelve-bit payload. Coordinates,
+polarity and time are transmitted as state changes. A direct X word emits one
+event. Vector words emit selected positions relative to the current X base.
+Y contains an eleven-bit coordinate and a camera-system bit. Time is assembled
+from twelve-bit high and low words, with microsecond units. Sensor configuration
+determines byte order. See the primary
+<a href="https://docs.prophesee.ai/stable/data/encoding_formats/evt3.html">Prophesee EVT3 format</a>
+and <a href="https://github.com/prophesee-ai/openeb/blob/main/standalone_samples/metavision_evt3_raw_file_decoder/metavision_evt3_raw_file_decoder.cpp">OpenEB standalone decoder</a>.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Type</th>
+<th scope="col">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x0</code></td>
+<td>Update Y and camera-system state</td>
+</tr>
+<tr>
+<td><code>0x2</code></td>
+<td>Direct X and polarity event</td>
+</tr>
+<tr>
+<td><code>0x3</code></td>
+<td>Update vector X base and polarity</td>
+</tr>
+<tr>
+<td><code>0x4</code> / <code>0x5</code></td>
+<td>Twelve-bit / eight-bit vector mask</td>
+</tr>
+<tr>
+<td><code>0x6</code> / <code>0x8</code></td>
+<td>Update low / high timestamp</td>
+</tr>
+<tr>
+<td><code>0xA</code></td>
+<td>External trigger</td>
+</tr>
+</tbody>
+</table></div>
+<p>The application supplies <code>uint16_t</code> words converted from incoming bytes using the stream's configured byte order. The helper packs two words per <code>uint</code>: the earlier word occupies bits 0–15, and the next occupies bits 16–31. An odd final word is valid. The application handles file headers, transport acquisition and USB framing before loading a batch.</p>
+<h2 id="connect-the-decoder">Connect the decoder</h2>
+<p>The reusable wiring is in <a href="source/examples/evt3_support.hpp.html">evt3_support.hpp</a>.
+Attach these native modules to the executable that uses it:</p>
+<pre><code class="language-cmake"><span class="tok-nb">shdr_target_shaders</span><span class="tok-p">(</span><span class="tok-s">app</span><span class="tok-w"> </span><span class="tok-s">PRIVATE</span><span class="tok-w"> </span><span class="tok-s">SOURCES</span><span class="tok-w"> </span><span class="tok-c"># Compile and embed every stage used by this decoder.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/evt3_summary.cpp</span><span class="tok-w"> </span><span class="tok-c"># Summarize each block's state changes and event counts.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/evt3_seed.cpp</span><span class="tok-w"> </span><span class="tok-c"># Carry decoding state between ordered blocks.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/rle_offsets.cpp</span><span class="tok-w"> </span><span class="tok-c"># Compute compact event output offsets.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/evt3_emit.cpp</span><span class="tok-w"> </span><span class="tok-c"># Expand encoded words into ordered event records.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/evt3_reset.cpp</span><span class="tok-w"> </span><span class="tok-c"># Clear persistent state for independent recordings.</span>
+<span class="tok-w">    </span><span class="tok-s">examples/shaders/evt3_flow.cpp</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c"># Add the optional downstream normal-flow stage.</span>
+</code></pre>
+<p>Include the helper and keep one decoder per independent stream:</p>
+<pre><code class="language-cpp"><span class="tok-cp">#</span><span class="tok-cp">include</span><span class="tok-w"> </span><span class="tok-cpf">"examples/evt3_support.hpp"</span><span class="tok-c1"> // Use the example decoder wrapper and its typed resources.</span>
+
+<span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">evt3_decoder</span><span class="tok-w"> </span><span class="tok-nf">decoder</span><span class="tok-p">(</span><span class="tok-mi">4096</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Maximum words per batch.</span>
+<span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vector</span><span class="tok-o">&lt;</span><span class="tok-n">std</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-kt">uint16_t</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">words</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-p">{</span><span class="tok-mh">0x8001</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mh">0x6002</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mh">0x0007</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mh">0x2803</span><span class="tok-p">}</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Provide a short valid EVT3 word sequence.</span>
+<span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">load</span><span class="tok-p">(</span><span class="tok-n">words</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Pack the words and resize the decoder's resources.</span>
+<span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">stream_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w">          </span><span class="tok-c1">// Or run(gpu) with a headless_device.</span>
+
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-w"> </span><span class="tok-n">count</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">event_count</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Read the completed compact event count.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">uvec4</span><span class="tok-o">&gt;</span><span class="tok-o">&amp;</span><span class="tok-w"> </span><span class="tok-n">result</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">events</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Read events through a const buffer view.</span>
+<span class="tok-k">const</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">uvec4</span><span class="tok-o">*</span><span class="tok-w"> </span><span class="tok-n">events</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">result</span><span class="tok-p">.</span><span class="tok-n">data</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Obtain the completed host-visible event array.</span>
+<span class="tok-c1">// events[0] is X=3, Y=7, polarity=1, timestamp=4098 microseconds.</span>
+</code></pre>
+<p>Call <code>stream_pipeline()</code> for consecutive batches. It retains Y, vector base, polarity, time and wrap state. Use <code>reset_pipeline()</code> for independent inputs. <code>load</code> updates the batch and dispatch sizes while preserving stream state. Empty batches produce zero events and preserve state.</p>
+<p>The helper reserves worst-case storage for twelve events per input word. Its
+capacity is fixed at construction. Reject or split larger incoming batches.
+The optional block-size argument defaults to 128 words and accepts 1–4096.
+<code>event_count()</code> reads the compact length from the offset buffer. On a GPU this
+is a host synchronization point, as is downloading the event buffer. Downstream
+GPU stages can instead consume the output buffer and its offsets directly.</p>
+<h2 id="understand-the-output">Understand the output</h2>
+<p>Each output event occupies one <code>uvec4</code>, with a 16-byte buffer stride:</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Component</th>
+<th scope="col">CD event</th>
+<th scope="col">Trigger event</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.x</code></td>
+<td>Eleven-bit X</td>
+<td>Trigger channel ID</td>
+</tr>
+<tr>
+<td><code>.y</code></td>
+<td>Y bits 0–10, polarity bit 11, camera-system bit 12</td>
+<td>Bit 31 set, edge value in bit 0</td>
+</tr>
+<tr>
+<td><code>.z</code></td>
+<td>Timestamp bits 0–31</td>
+<td>Timestamp bits 0–31</td>
+</tr>
+<tr>
+<td><code>.w</code></td>
+<td>Timestamp bits 32–55</td>
+<td>Timestamp bits 32–55</td>
+</tr>
+</tbody>
+</table></div>
+<p>Reconstruct time with <code>(uint64_t(event.w) &lt;&lt; 32) | event.z</code>. All eleven Y bits
+are retained. Events follow input order. Set vector bits emit from low to high
+X offset. Trigger events remain interleaved at their input position.</p>
+<p>Persistent state uses two <code>uvec4</code> elements:</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">State element</th>
+<th scope="col"><code>.x</code></th>
+<th scope="col"><code>.y</code></th>
+<th scope="col"><code>.z</code></th>
+<th scope="col"><code>.w</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state[0]</code></td>
+<td>Y plus camera bit</td>
+<td>Vector X base</td>
+<td>Vector polarity</td>
+<td>High time</td>
+</tr>
+<tr>
+<td><code>state[1]</code></td>
+<td>Low time</td>
+<td>Wrap counter</td>
+<td>Time synchronized flag</td>
+<td>Reserved</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="process-compact-cd-events-on-the-cpu">Process compact CD events on the CPU</h2>
+<p>A host consumer can convert decoded contrast-detection events to one <code>uint64_t</code>
+per event:</p>
+<pre><code class="language-cpp"><span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">compact</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr_examples</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">evt3_compact_cd_to64</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Convert CD records into the compact CPU event representation.</span>
+<span class="tok-w">    </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">events</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">event_count</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Convert only the decoded events in this batch.</span>
+</code></pre>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Bit range</th>
+<th scope="col">Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–10</td>
+<td>X, eleven bits</td>
+</tr>
+<tr>
+<td>11–20</td>
+<td>Y, ten bits</td>
+</tr>
+<tr>
+<td>21</td>
+<td>Polarity</td>
+</tr>
+<tr>
+<td>22–63</td>
+<td>Timestamp, forty-two bits in microseconds</td>
+</tr>
+</tbody>
+</table></div>
+<p>The helper skips trigger records and omits the camera-system bit. It validates
+<code>X &lt; 2048</code>, <code>Y &lt; 1024</code> and <code>timestamp &lt; 2^42</code>, throwing on a value that would be
+truncated. It also validates the supplied event count. For larger coordinates,
+longer timestamps or mixed-camera processing, retain the original <code>uvec4</code>
+representation. A GPU-produced buffer is downloaded automatically for this CPU
+consumer.</p>
+<h2 id="link-an-event-optical-flow-stage">Link an event optical-flow stage</h2>
+<p><a href="source/examples/shaders/evt3_flow.cpp.html">evt3_flow.cpp</a> fits a local plane to event
+timestamps. Append it to the decode pipeline and keep the event count in GPU
+storage:</p>
+<pre><code class="language-cpp"><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">buffer</span><span class="tok-o">&lt;</span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">glsl</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">vec4</span><span class="tok-o">&gt;</span><span class="tok-w"> </span><span class="tok-n">flow</span><span class="tok-p">(</span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">events</span><span class="tok-p">.</span><span class="tok-n">size</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Reserve a flow result for every possible decoder output.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">motion</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">make_kernel</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">evt3_flow_kernel</span><span class="tok-s">"</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Create the embedded temporal-plane flow kernel.</span>
+<span class="tok-n">motion</span><span class="tok-o">-</span><span class="tok-o">&gt;</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">events</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">events</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Connect ordered decoded events to the flow stage.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">offsets</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">offsets</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Connect the decoder's compact output offsets.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">bind</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">flow</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">flow</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Write one normal-flow result per event.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">blocks</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">blocks</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Tell the shader how many offset blocks describe this batch.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">radius</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mf">3.f</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Search within a three-pixel spatial radius.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">history</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">128u</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-c1">// Inspect at most 128 earlier events.</span>
+<span class="tok-w"> </span><span class="tok-p">.</span><span class="tok-n">set</span><span class="tok-p">(</span><span class="tok-s">"</span><span class="tok-s">time_window</span><span class="tok-s">"</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-mi">10000u</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Restrict neighbor timestamps to a 10,000-microsecond window.</span>
+<span class="tok-k">auto</span><span class="tok-w"> </span><span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">decoder</span><span class="tok-p">.</span><span class="tok-n">reset_pipeline</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Start with reset and the four decoding stages.</span>
+<span class="tok-n">pipeline</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-o">=</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">dispatch</span><span class="tok-p">(</span><span class="tok-o">*</span><span class="tok-n">motion</span><span class="tok-p">,</span><span class="tok-w"> </span><span class="tok-n">shdr</span><span class="tok-o">:</span><span class="tok-o">:</span><span class="tok-n">extent</span><span class="tok-p">(</span><span class="tok-w"> </span><span class="tok-c1">// Append flow using the backend-resident event count.</span>
+<span class="tok-w"> </span><span class="tok-kt">unsigned</span><span class="tok-p">(</span><span class="tok-p">(</span><span class="tok-n">flow</span><span class="tok-p">.</span><span class="tok-n">size</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">+</span><span class="tok-w"> </span><span class="tok-mi">63u</span><span class="tok-p">)</span><span class="tok-w"> </span><span class="tok-o">/</span><span class="tok-w"> </span><span class="tok-mi">64u</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Dispatch enough groups for worst-case event capacity.</span>
+<span class="tok-n">pipeline</span><span class="tok-p">.</span><span class="tok-n">run</span><span class="tok-p">(</span><span class="tok-p">)</span><span class="tok-p">;</span><span class="tok-w"> </span><span class="tok-c1">// Or pipeline.run(gpu).</span>
+</code></pre>
+<p>The dispatch covers allocated capacity. The shader reads <code>offsets[blocks]</code> to select valid output indices, keeping the compact event count on the backend between decoding and flow. For consecutive batches, use <code>stream_pipeline()</code> and update the flow kernel's <code>blocks</code> uniform when loading a different block count.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Port / uniform</th>
+<th scope="col">Type and purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>events</code></td>
+<td>Readonly <code>uvec4</code> decoded events</td>
+</tr>
+<tr>
+<td><code>offsets</code></td>
+<td>Readonly <code>uint</code> compact offsets</td>
+</tr>
+<tr>
+<td><code>flow</code></td>
+<td>Writeonly <code>vec4</code> results, at least decoded capacity</td>
+</tr>
+<tr>
+<td><code>blocks</code></td>
+<td><code>uint</code>, index of the final compact offset</td>
+</tr>
+<tr>
+<td><code>radius</code></td>
+<td><code>float</code>, spatial neighborhood radius in pixels</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td><code>uint</code>, preceding entries to examine, capped at 128</td>
+</tr>
+<tr>
+<td><code>time_window</code></td>
+<td><code>uint</code>, maximum elapsed microseconds</td>
+</tr>
+</tbody>
+</table></div>
+<p>For each CD event, the shader selects preceding CD events with matching polarity and camera-system bit, within the spatial radius and time window. It subtracts the low/high timestamp pair with an exact integer borrow before converting the bounded difference to float. The fit includes the center event and requires at least six neighbors, a nonsingular spatial fit and a nonzero time gradient.</p>
+<p>The result is <code>vec4(vx, vy, neighbor_count, valid)</code>. Velocities use pixels per second, and <code>valid</code> is zero or one. Failed fits and trigger records produce zero. Neighbor count measures sample support. The temporal-plane gradient determines <strong>normal flow</strong>, the velocity component constrained by that local plane. Estimating full two-dimensional motion requires additional spatial or motion information.</p>
+<p>The flow neighborhood contains earlier events in the current batch. Decoder state persists across batches. Flow cost is bounded by <code>event_count * min(history, 128)</code> neighborhood checks. Use separate input and output buffers and choose parameters for the intended event density and motion.</p>
+<p>The EVT3 example checks all flow outputs against an independent double-precision
+plane solver. A synthetic plane <code>t = 100*x + 50*y</code> microseconds has expected
+normal velocity <code>(8000, 4000)</code> pixels/second. Fixtures include timestamps crossing
+the low 32-bit boundary.</p>
+<h2 id="how-four-stages-preserve-stream-order">How four stages preserve stream order</h2>
+<ol>
+<li><strong>Summary:</strong> independent invocations scan blocks of input words. Each writes
+its final state changes, time-wrap summary and event counts.</li>
+<li><strong>Seed:</strong> one invocation scans the smaller summary array, computes every
+block's starting state and output count, and updates persistent stream state.</li>
+<li><strong>Offsets:</strong> one invocation computes exclusive output offsets from those
+counts, using the same prefix module as tiled RLE compression.</li>
+<li><strong>Emit:</strong> blocks decode concurrently into disjoint compact output intervals.
+They visit only set vector bits and write events directly in stream order.</li>
+</ol>
+<p>Resetting an independent batch adds a fifth stage. The two short serial scans process the block table, while summaries and event expansion run across blocks. Ordered dispatches and independent invocations express the sequential format state. This implementation processes complete input batches through compute dispatches.</p>
+<h2 id="format-policies-and-limits">Format policies and limits</h2>
+<p>The first high-time word establishes the output time base. Earlier state updates are retained. Each high-time word resets low time to zero, including a repeated high value. A high-time decrease of at least 4085 increments the wrap counter, matching OpenEB's large-jump tolerance. Smaller decreases update high time and preserve the wrap counter. Low-time values follow the encoded update sequence.</p>
+<p>The 32-bit wrap counter extends the 24-bit time base to 56 bits and cycles after <code>2^32</code> time-base wraps. Vector X arithmetic is modulo 2048. <code>VECT_8</code> uses payload bits 0–7. The decoder skips reserved types and <code>OTHERS</code>/<code>CONTINUED</code> extension records. Validate sensor geometry, input framing and recovery policy in the application before decoding.</p>
+<p>Decode consecutive batches of a stream in order. Give concurrent streams and independently queued jobs separate decoder objects, persistent state and writable output storage. See <a href="async.html">asynchronous execution</a> for background submissions.</p>
+<p>The example checks direct and vector events, trigger ordering, camera bits,
+initial synchronization, repeated time updates, timestamp wraps, odd and empty
+batches, arbitrary block cuts and state carried across batch boundaries against
+an independent scalar interpreter.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#recognize-the-input-format">Recognize the input format</a></li><li><a href="#connect-the-decoder">Connect the decoder</a></li><li><a href="#understand-the-output">Understand the output</a></li><li><a href="#process-compact-cd-events-on-the-cpu">Process compact CD events on the CPU</a></li><li><a href="#link-an-event-optical-flow-stage">Link an event optical-flow stage</a></li><li><a href="#how-four-stages-preserve-stream-order">How four stages preserve stream order</a></li><li><a href="#format-policies-and-limits">Format policies and limits</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

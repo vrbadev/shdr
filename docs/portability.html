@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Shader compatibility and portability"><title>Shader compatibility and portability · shdr 1.0.0</title><link rel="stylesheet" href="site.css"><link rel="stylesheet" href="highlight.css"></head><body><a class="skip-link" href="#content">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html">shdr<span class="release-version">1.0.0</span><span>CPU + GPU compute</span></a><nav class="site-nav" aria-label="Main navigation"><a href="index.html">Start</a><a href="examples.html">Examples</a><a href="results.html">Results</a><a href="corpus.html">Public shaders</a><a href="api.html">API</a></nav></div></header><div class="page-shell guide-layout"><main class="page-main" id="content"><p class="eyebrow">Practical guide</p><h1 id="shader-compatibility-and-portability">Shader compatibility and portability</h1>
+<p>shdr translates a compute shader into a C++11 CPU implementation and embeds a portable GPU variant for a graphics driver. Portable sources fit both the CPU adapter and selected GLSL profile. Check compiler compatibility, resource layout, dispatch dimensions and numerical behavior with the application's intended inputs.</p>
+<h2 id="choose-a-profile">Choose a profile</h2>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Backend</th>
+<th scope="col">Shader language and API</th>
+<th scope="col">Context requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>C++11 generated adapter</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>profile::es31</code></td>
+<td>GLSL ES 3.10 / OpenGL ES 3.1</td>
+<td>Current ES context</td>
+</tr>
+<tr>
+<td><code>profile::es32</code></td>
+<td>GLSL ES 3.20 / OpenGL ES 3.2</td>
+<td>Current ES context</td>
+</tr>
+<tr>
+<td><code>profile::gl43</code></td>
+<td>GLSL 4.30 / OpenGL 4.3</td>
+<td>Current desktop context</td>
+</tr>
+<tr>
+<td><code>profile::gl45</code></td>
+<td>GLSL 4.50 / OpenGL 4.5</td>
+<td>Current desktop context</td>
+</tr>
+<tr>
+<td><code>profile::gl46</code></td>
+<td>GLSL 4.60 / OpenGL 4.6</td>
+<td>Current desktop context</td>
+</tr>
+</tbody>
+</table></div>
+<p>A newer context can run an older supported shader profile. Select language features available in the requested profile. Core compute shaders and storage buffers establish the ES 3.1 / GL 4.3 baseline. CPU execution uses C++11 host code and resources. The API requirements are specified by <a href="https://registry.khronos.org/OpenGL/specs/es/3.1/es_spec_3.1.pdf">OpenGL ES 3.1</a> and <a href="https://registry.khronos.org/OpenGL/specs/gl/glspec43.core.pdf">OpenGL 4.3 core</a>.</p>
+<h2 id="create-a-headless-gpu-device">Create a headless GPU device</h2>
+<p>The EGL backend is part of the runtime header. Define <code>SHDR_ENABLE_EGL=1</code> and link EGL, or link the CMake <code>shdr::egl</code> target. <code>shdr::headless_device(profile)</code> creates a 1-by-1 pbuffer context, preferring a surfaceless display and falling back to EGL's default display. Select an API provided by the graphics driver. <code>backend_unavailable</code> identifies display, configuration, context or entry-point setup failures.</p>
+<p>Create and use a device on its context thread. The backend makes its context current for runtime operations and shares initialized display ownership across living contexts. Use <code>headless_device.make_current()</code> for external GL calls. GPU objects retain the context through their device state. Release their final owners on that thread before shutdown, and let the backend manage its EGL display lifetime. See the <a href="https://registry.khronos.org/EGL/specs/eglspec.1.5.pdf">EGL specification</a> for context and display lifetime rules.</p>
+<p>Applications with an existing GL context use <code>device(resolver, profile)</code> and keep that context alive and current. This integration uses the application's GL function resolver. Enable the EGL backend specifically when the library should create the context.</p>
+<h2 id="build-a-self-contained-compute-source">Build a self-contained compute source</h2>
+<p>Attach native files to an executable or shared module with <code>shdr_target_shaders(target PRIVATE SOURCES shader.cpp)</code>. The build frontend converts GLSL resource declarations and expressions into a C++11 translation unit and embeds the portable GPU program. The guarded <code>#include "shdr.h"</code> line integrates the CPU adapter and is removed from the GPU text.</p>
+<p>The helper accepts <code>.cpp</code>, <code>.comp</code> and <code>.glsl</code> sources. The selected profile supplies the exported shader version. Provide a self-contained shader with its helper functions in the same source, and choose features supported by both the adapter and that profile.</p>
+<p>GPU preparation can assign missing storage-buffer bindings and normalize
+interface declarations. It also spells out desktop numeric promotions with
+explicit scalar or vector constructors where ES requires them. Supported
+conversions cover initializers, arithmetic, comparisons, assignments, ternary
+branches and by-value helper arguments. Output and inout arguments remain
+lvalues. The expression evaluation order is retained.</p>
+<p>Global constants and local compile-time constants keep their qualifiers. A local
+<code>const</code> initialized from a runtime value loses that qualifier in the GPU variant,
+because GLSL ES requires a constant expression there. A compatibility helper
+handles integer boolean-selector <code>mix</code> on ES 3.1 and GL 4.3. Ordinary floating
+<code>mix</code> still uses the shader builtin. Inspect <code>kernel::glsl(profile)</code> when checking
+the final program passed to a driver.</p>
+<p>Mutable globals in a native shader are private to each invocation. Initialized globals receive fresh CPU state for each call to <code>main()</code>, and helper functions share that invocation's state. CPU initializers can read bound uniforms. For the ES 3.1 baseline, use constant global initializers and place uniform-dependent initialization inside <code>main()</code>. Extension-enabled sources follow their applicable initializer rules. Initialize every private variable before reading it. Use bound buffers or images for state shared across invocations or dispatches. Uniforms and resource bindings retain their application-supplied values. See <a href="https://registry.khronos.org/OpenGL/specs/es/3.1/GLSL_ES_Specification_3.10.pdf">GLSL ES 3.10 section 4.3</a> for initializer rules.</p>
+<p>A manually authored <code>SHDR_BEGIN</code> class is an ordinary C++ object. Put mutable
+per-invocation variables inside <code>SHDR_MAIN</code> when using that declaration interface
+for a dual CPU/GPU shader.</p>
+<p>Factories use the file stem plus <code>_kernel</code>. Bind declared array/image names with
+<code>kernel.bind</code>, and assign uniform names with <code>kernel.set</code>. Uniform types must
+match exactly: C++ <code>unsigned</code> corresponds to shader <code>uint</code>, and C++ <code>float</code>
+corresponds to shader <code>float</code>.</p>
+<p>Attach adapters directly to the final executable or loaded shared module for automatic factory registration. When using a static archive, configure the application linker to retain registration objects.</p>
+<h2 id="match-interfaces-and-memory-layout">Match interfaces and memory layout</h2>
+<p>Portable storage-buffer elements are 32-bit <code>float</code>, <code>int</code> or <code>uint</code>, and matching two- or four-component vectors. Their array strides match <code>std430</code>. Use three-component vectors, matrices and booleans in supported local math or uniforms. Convert structured data into supported scalar or vector arrays before binding it to storage ports.</p>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Scrollable data table"><table>
+<thead>
+<tr>
+<th scope="col">Source construct</th>
+<th scope="col">Adapter support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runtime-sized or fixed-size single-array buffer block</td>
+<td>Supported with matching element layout</td>
+</tr>
+<tr>
+<td><code>layout(std430)</code> on a block or as a global buffer default</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td>Explicit or omitted buffer binding</td>
+<td>Supported, omitted bindings are assigned and added to GPU declarations</td>
+</tr>
+<tr>
+<td>Literal, object-macro, or constant-integer layout expression</td>
+<td>Supported integer arithmetic</td>
+</tr>
+<tr>
+<td>Individual uniform with optional explicit location</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td>Fixed-size private/local arrays and array constructors</td>
+<td>Supported through <code>glsl::array&lt;T,N&gt;</code></td>
+</tr>
+<tr>
+<td>Fixed-size array function parameters</td>
+<td>Supported with matching declared size</td>
+</tr>
+<tr>
+<td>Scalar conversion from vector, swizzle, or matrix</td>
+<td>Supported using the first component</td>
+</tr>
+<tr>
+<td>Vulkan buffer descriptor set zero</td>
+<td>Imported to ordinary OpenGL buffer bindings</td>
+</tr>
+<tr>
+<td>Specialization constant with an initializer</td>
+<td>Imported using its declared default value</td>
+</tr>
+<tr>
+<td>Supported push-constant block fields</td>
+<td>Exposed as named uniforms such as <code>params.count</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>A fixed-size shader buffer requires at least its declared element count in the bound resource. The shader length remains that declared count when the resource has extra capacity. Native array <code>.length()</code> expressions return GLSL's signed <code>int</code> on both backends, including boundary arithmetic and unsigned comparisons. The build assigns GPU binding numbers for the baseline GL interfaces.</p>
+<p>Single-field storage blocks can be uninstanced, or accessed through a block
+instance. For a declaration <code>buffer B { float values[]; } data;</code>, bind the port
+with <code>&quot;data.values&quot;</code>. Allocate enough resource elements for every index the
+shader can access. Resource sizes, dimensions, and bound shader interfaces must
+agree.</p>
+<p>Storage images use one or four interleaved 32-bit scalar components: <code>r32f</code>, <code>r32i</code>, <code>r32ui</code>, <code>rgba32f</code>, <code>rgba32i</code> and <code>rgba32ui</code>. Match the GLSL image type to that format. Portable RGBA declarations use separate <code>readonly</code> and <code>writeonly</code> ports. Single-component <code>r32</code> images also support read/write access. Supply image values in their native scalar representation.</p>
+<p>Use individual scalar, vector or float-matrix uniforms. Supported Vulkan push-constant members become independently set named GL uniforms. Descriptor set zero maps to OpenGL resource bindings, and specialization constants use their declared default values. This interface supplies OpenGL resource semantics for the imported source.</p>
+<p>Use supported storage-buffer and storage-image ports with individual uniforms. Adapt sampler reads, uniform blocks or arrays, structured storage elements and graphics-stage interfaces into that compute interface before importing them. Match every bound array to its declared scalar or vector element layout.</p>
+<h2 id="keep-invocations-independent">Keep invocations independent</h2>
+<p>Each invocation should write its own output elements and read stable input.
+Use separate resources for neighborhood filters and separate dispatches for
+producer/consumer dependencies. An in-place image blur is a GPU data race even
+when a serial CPU loop happens to produce a plausible image.</p>
+<p>The CPU backend runs independent invocations serially. Portable kernels use local state, supported math and explicit storage ports. Express communication through ordered dispatches and bound resources. Adapt workgroup shared storage, barriers, atomics, subgroup operations, derivatives, sampling and graphics stages to this independent-invocation interface before adding a source to a dual-backend target.</p>
+<p>Use function-local mutable variables for invocation-local state. Native helper functions, scalar/vector math, swizzles, loops and branches form the common subset. Give each destination component exactly one position in a writable swizzle.</p>
+<h2 id="dispatch-within-device-limits">Dispatch within device limits</h2>
+<p>A shader's <code>layout(local_size_x=..., local_size_y=..., local_size_z=...) in;</code>
+defines its local group. <code>extent(gx,gy,gz)</code> gives group counts. Each dimension
+executes <code>local_size * group_count</code> invocations. Round up the group count and
+keep an explicit bounds check for incomplete groups.</p>
+<p>Small groups such as <code>(64,1,1)</code> or <code>(8,8,1)</code> fit broad ES 3.1 devices. Guaranteed
+ES 3.1 minima include 128 invocations per group, axis limits of at least
+<code>(128,128,64)</code>, four storage blocks, and four image uniforms per compute shader.
+Larger groups and resource counts require checking the actual implementation.
+The ordinary compute builtins <code>gl_GlobalInvocationID</code>, <code>gl_LocalInvocationID</code>,
+<code>gl_WorkGroupID</code>, <code>gl_NumWorkGroups</code>, <code>gl_WorkGroupSize</code>, and
+<code>gl_LocalInvocationIndex</code> have their standard meanings.</p>
+<p>The runtime inserts GL memory barriers between its dispatches and synchronizes
+resource contents at CPU/GPU transitions. A memory barrier establishes visibility
+for later operations. Host readback or <code>device.synchronize()</code> establishes a
+completion wait. Application-issued GL commands need barriers matching their
+own consumers and modification notifications for shared resources. See the
+<a href="https://wikis.khronos.org/opengl/Incoherent_Memory_Access">Khronos memory model guide</a>.</p>
+<p><code>pipeline.submit(device)</code> queues GPU stages and returns a completion fence. <code>executor.submit(pipeline)</code> snapshots CPU work for a bounded worker pool. Use independent writable resources for concurrent jobs. The <a href="async.html">asynchronous guide</a> explains preparation, polling, queue limits and explicit shutdown.</p>
+<h2 id="compare-numbers-appropriately">Compare numbers appropriately</h2>
+<p>The portable scalar types are 32-bit <code>float</code>, <code>int</code> and <code>uint</code>. CPU and GPU floating-point contraction, rounding, denormals, exceptional values and transcendental approximations can differ. Choose absolute and relative tolerances for the algorithm. Keep signed results representable, use defined shift operands and counts, use nonzero divisors and keep indices within initialized storage.</p>
+<p>Use <code>float</code> for the common ES 3.1/3.2 math subset. Host math also provides double-precision types. For <code>fma</code>, select ES 3.2, a supporting desktop profile or an applicable extension. See the <a href="https://registry.khronos.org/OpenGL/specs/es/3.2/GLSL_ES_Specification_3.20.html">GLSL ES 3.20 specification</a>. The build frontend supplies integer boolean-selector <code>mix</code> through a compatibility helper for the baseline portable GPU profiles.</p>
+<h2 id="validate-an-imported-shader">Validate an imported shader</h2>
+<p>Build the CPU adapter, inspect diagnostics and run a small input with known reference output. Check each stage before composing a larger pipeline. Export <code>kernel.glsl(profile)</code> for an independent GLSL compiler check, then execute the driver path and compare resource layout, dispatch coverage and numerical results.</p>
+<p>The <a href="api.html">API reference</a> documents runtime functions and math helpers. The <a href="imaging.html">imaging guide</a> lists kernels with explicit formats, border rules and dispatch sizes. The <a href="corpus.html">public-source report</a> records 664 inputs, including 443 accepted by reference compilers and 258 with strict C++11 adapters and all five GPU profiles. Check imported algorithms against numerical references and their intended inputs.</p>
+</main><aside class="toc" aria-label="On this page"><p>On this page</p><ul><li><a href="#choose-a-profile">Choose a profile</a></li><li><a href="#create-a-headless-gpu-device">Create a headless GPU device</a></li><li><a href="#build-a-self-contained-compute-source">Build a self-contained compute source</a></li><li><a href="#match-interfaces-and-memory-layout">Match interfaces and memory layout</a></li><li><a href="#keep-invocations-independent">Keep invocations independent</a></li><li><a href="#dispatch-within-device-limits">Dispatch within device limits</a></li><li><a href="#compare-numbers-appropriately">Compare numbers appropriately</a></li><li><a href="#validate-an-imported-shader">Validate an imported shader</a></li></ul></aside></div><footer class="footer"><p>shdr 1.0.0 · C++11 compute pipelines · <a href="portability.html">Portability and requirements</a> · <a href="source/index.html">Read the source</a></p></footer></body></html>

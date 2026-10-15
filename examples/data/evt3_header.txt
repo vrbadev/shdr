@@ -1,0 +1,7 @@
+% Date 2020-09-25 07:48:30
+% evt 3.0
+% firmware_version 3.2.3
+% integrator_name Prophesee
+% plugin_name hal_plugin_gen41_evk3
+% serial_number 00001034
+% system_ID 48

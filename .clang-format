@@ -1,0 +1,41 @@
+# Start with familiar C++ indentation and brace placement.
+BasedOnStyle: LLVM
+# Use four spaces for each nested block.
+IndentWidth: 4
+# Keep source lines short enough to read beside explanatory comments.
+ColumnLimit: 100
+# Preserve the line wrapping of written explanations.
+ReflowComments: false
+# Keep statement bodies on separate lines.
+AllowShortBlocksOnASingleLine: Never
+# Show every function body as a sequence of steps.
+AllowShortFunctionsOnASingleLine: None
+# Give conditional bodies their own lines.
+AllowShortIfStatementsOnASingleLine: Never
+# Give loop bodies their own lines.
+AllowShortLoopsOnASingleLine: false
+# Expand worker callbacks in the same style as other functions.
+AllowShortLambdasOnASingleLine: None
+# Keep includes in their existing logical groups.
+SortIncludes: Never
+# Keep long literal strings intact so embedded shader text stays unchanged.
+BreakStringLiterals: false
+# Put pointers beside their types.
+PointerAlignment: Left
+# Keep line comments beside their own statements.
+AlignTrailingComments:
+  Kind: Never
+# Keep unrelated constructor arguments on separate lines.
+BinPackArguments: false
+# Make long parameter lists readable one argument at a time.
+BinPackParameters: false
+# Treat declaration macros as complete statements so their indentation stays flat.
+StatementMacros:
+  - SHDR_GL_PROC
+  - SHDR_GL_UNIFORM
+  - SHDR_GL_MATRIX
+  - SHDR_LOAD
+  - SHDR_LOAD_UNIFORM
+  - SHDR_BUFFER
+  - SHDR_UNIFORM
+  - SHDR_IMAGE2D
